@@ -1,0 +1,169 @@
+object Profile: TProfile
+  Left = 0
+  Top = 0
+  Caption = 'Your profile'
+  ClientHeight = 839
+  ClientWidth = 1126
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -12
+  Font.Name = 'Segoe UI'
+  Font.Style = []
+  OnClose = FormClose
+  OnCreate = FormCreate
+  OnResize = FormResize
+  OnShow = FormShow
+  TextHeight = 15
+  object LabelLogin: TLabel
+    Left = 272
+    Top = 168
+    Width = 58
+    Height = 15
+    Caption = 'LabelLogin'
+  end
+  object LabelFirstname: TLabel
+    Left = 272
+    Top = 216
+    Width = 80
+    Height = 15
+    Caption = 'LabelFirstname'
+  end
+  object LabelLastname: TLabel
+    Left = 272
+    Top = 248
+    Width = 79
+    Height = 15
+    Caption = 'LabelLastname'
+  end
+  object LabelCountry: TLabel
+    Left = 272
+    Top = 288
+    Width = 71
+    Height = 15
+    Caption = 'LabelCountry'
+  end
+  object LabelCreationDate: TLabel
+    Left = 272
+    Top = 336
+    Width = 97
+    Height = 15
+    Caption = 'LabelCreationDate'
+  end
+  object ValueLogin: TLabel
+    Left = 272
+    Top = 368
+    Width = 58
+    Height = 15
+    Caption = 'ValueLogin'
+  end
+  object ValueFirstname: TLabel
+    Left = 272
+    Top = 408
+    Width = 80
+    Height = 15
+    Caption = 'ValueFirstname'
+  end
+  object ValueLastname: TLabel
+    Left = 272
+    Top = 448
+    Width = 79
+    Height = 15
+    Caption = 'ValueLastname'
+  end
+  object ValueCountry: TLabel
+    Left = 272
+    Top = 488
+    Width = 71
+    Height = 15
+    Caption = 'ValueCountry'
+  end
+  object ValueCreationDate: TLabel
+    Left = 272
+    Top = 520
+    Width = 97
+    Height = 15
+    Caption = 'ValueCreationDate'
+  end
+  object LabelRapid: TLabel
+    Left = 472
+    Top = 176
+    Width = 58
+    Height = 15
+    Caption = 'LabelRapid'
+  end
+  object LabelBlitz: TLabel
+    Left = 472
+    Top = 272
+    Width = 50
+    Height = 15
+    Caption = 'LabelBlitz'
+  end
+  object LabelBullet: TLabel
+    Left = 472
+    Top = 352
+    Width = 58
+    Height = 15
+    Caption = 'LabelBullet'
+  end
+  object EditButton: TButton
+    Left = 736
+    Top = 296
+    Width = 75
+    Height = 25
+    Caption = 'EditButton'
+    TabOrder = 0
+  end
+  object SaveButton: TButton
+    Left = 736
+    Top = 332
+    Width = 75
+    Height = 25
+    Caption = 'SaveButton'
+    TabOrder = 1
+  end
+  object EditFirstname: TEdit
+    Left = 656
+    Top = 464
+    Width = 121
+    Height = 23
+    TabOrder = 2
+    Text = 'EditFirstname'
+  end
+  object EditLastname: TEdit
+    Left = 656
+    Top = 493
+    Width = 121
+    Height = 23
+    TabOrder = 3
+    Text = 'EditLastname'
+  end
+  object EditCountry: TEdit
+    Left = 656
+    Top = 522
+    Width = 121
+    Height = 23
+    TabOrder = 4
+    Text = 'EditCountry'
+  end
+  object FDQuery1: TFDQuery
+    Left = 880
+    Top = 328
+  end
+  object FDConnection1: TFDConnection
+    Params.Strings = (
+      'Server=127.0.0.1'
+      'Database=pascalchess'
+      'User_Name=root'
+      'DriverID=MySQL')
+    Left = 880
+    Top = 392
+  end
+  object FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink
+    VendorLib = 
+      'C:\Users\Mateusz\Documents\Embarcadero\Studio\Projects\libmysql.' +
+      'dll'
+    Left = 880
+    Top = 464
+  end
+end

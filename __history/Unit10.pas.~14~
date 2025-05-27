@@ -1,0 +1,671 @@
+﻿unit Unit10;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
+  IdBaseComponent, IdComponent, IdCustomTCPServer, IdTCPServer, IdContext,
+  System.Generics.Collections, SyncObjs, FireDAC.Stan.Intf, FireDAC.Stan.Option,
+  FireDAC.Stan.Param, FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf,
+  FireDAC.DApt.Intf, FireDAC.Stan.Async, FireDAC.DApt, FireDAC.UI.Intf,
+  FireDAC.Stan.Def, FireDAC.Stan.Pool, FireDAC.Phys, FireDAC.Phys.MySQL,
+  FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait, Data.DB, FireDAC.Comp.Client,
+  FireDAC.Comp.DataSet;
+
+type
+  /// Informacje o graczu oczekującym na parę
+  TPlayerInfo = record
+    Context: TIdContext;
+    Login: string;
+    ID: Integer;
+  end;
+
+  /// Para graczy: biały i czarny
+  TPlayerPair = record
+    WhitePlayer, BlackPlayer: TIdContext;
+    WhiteLogin, BlackLogin: string;
+    WhiteID, BlackID: Integer;
+  end;
+
+  TForm10 = class(TForm)
+    IdTCPServer1: TIdTCPServer;
+    MemoLog: TMemo;
+    FDQuery1: TFDQuery;
+    FDConnection1: TFDConnection;
+    FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure IdTCPServer1Execute(AContext: TIdContext);
+    procedure IdTCPServer1Connect(AContext: TIdContext);
+    procedure IdTCPServer1Disconnect(AContext: TIdContext);
+  private
+    WaitingRapid, WaitingBlitz, WaitingBullet: TList<TPlayerInfo>;
+    ActivePairs: TList<TPlayerPair>;
+    ListLock: TCriticalSection;
+
+    procedure TryPairRapid;
+    procedure TryPairBlitz;
+    procedure TryPairBullet;
+    function FindPairWithPlayer(Player: TIdContext): TPlayerPair;
+    function IsPlayerPaired(Player: TIdContext): Boolean;
+    procedure BroadcastToOpponent(SenderClient: TIdContext; const Msg: string);
+    procedure BroadcastPromotion(SenderClient: TIdContext; const Msg: string);
+    procedure Log(const Msg: string);
+    procedure BroadcastEndgame(SenderClient: TIdContext; const Msg: string);
+  public
+    { Publiczne metody – brak }
+  end;
+
+var
+  Form10: TForm10;
+
+implementation
+
+{$R *.dfm}
+
+{ Loguje komunikaty w TMemo bezpiecznie z każdego wątku }
+procedure TForm10.Log(const Msg: string);
+begin
+  TThread.Queue(nil,
+    procedure
+    begin
+      MemoLog.Lines.Add(FormatDatetime('hh:nn:ss.zzz', Now) + ' - ' + Msg);
+    end
+  );
+end;
+
+procedure TForm10.FormCreate(Sender: TObject);
+begin
+  Randomize;
+  // Tworzymy listy i sekcję krytyczną
+  WaitingRapid  := TList<TPlayerInfo>.Create;
+  WaitingBlitz  := TList<TPlayerInfo>.Create;
+  WaitingBullet := TList<TPlayerInfo>.Create;
+  ActivePairs    := TList<TPlayerPair>.Create;
+  ListLock       := TCriticalSection.Create;
+
+  // Ustawienia MemoLog
+  MemoLog.Clear;
+  Log('Server startuje...');
+
+  // Ustawienia serwera TCP
+  IdTCPServer1.DefaultPort := 5000;
+  IdTCPServer1.OnConnect    := IdTCPServer1Connect;
+  IdTCPServer1.OnDisconnect := IdTCPServer1Disconnect;
+  IdTCPServer1.Active      := True;
+
+  Log('Serwer nasłuchuje na porcie 5000');
+end;
+
+procedure TForm10.FormDestroy(Sender: TObject);
+begin
+  // Sprzątamy
+  IdTCPServer1.Active := False;
+  ListLock.Free;
+  WaitingRapid.Free;
+  WaitingBlitz.Free;
+  WaitingBullet.Free;
+  ActivePairs.Free;
+  Log('Serwer zatrzymany');
+end;
+
+procedure TForm10.IdTCPServer1Connect(AContext: TIdContext);
+begin
+  Log('Nowe połączenie z ' + AContext.Binding.PeerIP + ':' + AContext.Binding.PeerPort.ToString);
+end;
+
+procedure TForm10.IdTCPServer1Disconnect(AContext: TIdContext);
+var
+  Pair: TPlayerPair;
+  Opponent: TIdContext;
+  i: Integer;
+begin
+  Log('Rozłączono ' + AContext.Binding.PeerIP + ':' + AContext.Binding.PeerPort.ToString);
+
+  ListLock.Acquire;
+  try
+    // Szukamy pary zawierającej tego gracza
+    for i := ActivePairs.Count - 1 downto 0 do
+    begin
+      Pair := ActivePairs[i];
+
+      if (Pair.WhitePlayer = AContext) or (Pair.BlackPlayer = AContext) then
+      begin
+        if Pair.WhitePlayer = AContext then
+          Opponent := Pair.BlackPlayer
+        else
+          Opponent := Pair.WhitePlayer;
+
+        // Usuwamy parę z listy
+        ActivePairs.Delete(i);
+
+        // Informujemy przeciwnika
+        if (Opponent <> nil) and Opponent.Connection.Connected then
+        begin
+          Opponent.Connection.IOHandler.WriteLn('OPPONENT_LEFT');
+          Log('Wysłano do przeciwnika: OPPONENT_LEFT');
+        end;
+
+        Break;
+      end;
+    end;
+  finally
+    ListLock.Release;
+  end;
+end;
+
+
+
+
+procedure TForm10.TryPairRapid;
+var
+  P1, P2: TPlayerInfo;
+  Pair: TPlayerPair;
+begin
+  ListLock.Acquire;
+  try
+    if WaitingRapid.Count < 2 then Exit;
+    P1 := WaitingRapid[0];
+    P2 := WaitingRapid[1];
+    WaitingRapid.Delete(1);
+    WaitingRapid.Delete(0);
+
+    // losowo biały/czarny
+    if Random(2)=0 then
+    begin
+      Pair.WhitePlayer := P1.Context; Pair.WhiteLogin := P1.Login; Pair.WhiteID := P1.ID;
+      Pair.BlackPlayer := P2.Context; Pair.BlackLogin := P2.Login; Pair.BlackID := P2.ID;
+    end else
+    begin
+      Pair.WhitePlayer := P2.Context; Pair.WhiteLogin := P2.Login; Pair.WhiteID := P2.ID;
+      Pair.BlackPlayer := P1.Context; Pair.BlackLogin := P1.Login; Pair.BlackID := P1.ID;
+    end;
+    ActivePairs.Add(Pair);
+  finally
+    ListLock.Release;
+  end;
+
+  Log(Format('RAPID: %s vs %s', [Pair.WhiteLogin, Pair.BlackLogin]));
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('START');
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('COLOR:WHITE');
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('OPPONENT:'+Pair.BlackLogin);
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('ID:'+Pair.BlackID.ToString);
+
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('START');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('COLOR:BLACK');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('OPPONENT:'+Pair.WhiteLogin);
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('ID:'+Pair.WhiteID.ToString);
+end;
+
+
+
+
+
+
+
+procedure TForm10.TryPairBlitz;
+var P1,P2: TPlayerInfo; Pair: TPlayerPair;
+begin
+  ListLock.Acquire;
+  try
+    if WaitingBlitz.Count < 2 then Exit;
+    P1 := WaitingBlitz[0]; P2 := WaitingBlitz[1];
+    WaitingBlitz.Delete(1); WaitingBlitz.Delete(0);
+    if Random(2)=0 then
+    begin
+      Pair.WhitePlayer := P1.Context; Pair.WhiteLogin := P1.Login; Pair.WhiteID := P1.ID;
+      Pair.BlackPlayer := P2.Context; Pair.BlackLogin := P2.Login; Pair.BlackID := P2.ID;
+    end else
+    begin
+      Pair.WhitePlayer := P2.Context; Pair.WhiteLogin := P2.Login; Pair.WhiteID := P2.ID;
+      Pair.BlackPlayer := P1.Context; Pair.BlackLogin := P1.Login; Pair.BlackID := P1.ID;
+    end;
+    ActivePairs.Add(Pair);
+  finally
+    ListLock.Release;
+  end;
+  Log(Format('BLITZ: %s vs %s', [Pair.WhiteLogin, Pair.BlackLogin]));
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('START');
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('COLOR:WHITE');
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('OPPONENT:'+Pair.BlackLogin);
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('ID:'+Pair.BlackID.ToString);
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('START');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('COLOR:BLACK');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('OPPONENT:'+Pair.WhiteLogin);
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('ID:'+Pair.WhiteID.ToString);
+end;
+
+
+
+procedure TForm10.TryPairBullet;
+var P1,P2: TPlayerInfo; Pair: TPlayerPair;
+begin
+  ListLock.Acquire;
+  try
+    if WaitingBullet.Count < 2 then Exit;
+    P1 := WaitingBullet[0]; P2 := WaitingBullet[1];
+    WaitingBullet.Delete(1); WaitingBullet.Delete(0);
+    if Random(2)=0 then
+    begin
+      Pair.WhitePlayer := P1.Context; Pair.WhiteLogin := P1.Login; Pair.WhiteID := P1.ID;
+      Pair.BlackPlayer := P2.Context; Pair.BlackLogin := P2.Login; Pair.BlackID := P2.ID;
+    end else
+    begin
+      Pair.WhitePlayer := P2.Context; Pair.WhiteLogin := P2.Login; Pair.WhiteID := P2.ID;
+      Pair.BlackPlayer := P1.Context; Pair.BlackLogin := P1.Login; Pair.BlackID := P1.ID;
+    end;
+    ActivePairs.Add(Pair);
+  finally
+    ListLock.Release;
+  end;
+  Log(Format('BULLET: %s vs %s', [Pair.WhiteLogin, Pair.BlackLogin]));
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('START');
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('COLOR:WHITE');
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('OPPONENT:'+Pair.BlackLogin);
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('ID:'+Pair.BlackID.ToString);
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('START');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('COLOR:BLACK');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('OPPONENT:'+Pair.WhiteLogin);
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('ID:'+Pair.WhiteID.ToString);
+end;
+
+
+
+
+/// Próbuje sparować dwóch pierwszych oczekujących graczy
+{{
+procedure TForm10.TryPairPlayers;
+var
+  P1, P2: TPlayerInfo;
+  Pair: TPlayerPair;
+  FirstIsWhite: Boolean;
+begin
+  ListLock.Acquire;
+  try
+    if WaitingPlayers.Count < 2 then
+    begin
+      Log('Nie ma wystarczająco graczy w kolejce: ' + WaitingPlayers.Count.ToString);
+      Exit;
+    end;
+
+    // Pobieramy dwóch pierwszych w kolejce
+    P1 := WaitingPlayers[0];
+    P2 := WaitingPlayers[1];
+
+    // Losowo przypisujemy, kto będzie biały
+    FirstIsWhite := Random(2) = 0;
+    if FirstIsWhite then
+    begin
+      Pair.WhitePlayer := P1.Context;
+      Pair.WhiteLogin  := P1.Login;
+      Pair.BlackPlayer := P2.Context;
+      Pair.BlackLogin  := P2.Login;
+      Pair.WhiteID := P1.ID;
+      Pair.BlackID := P2.ID;
+    end
+    else
+    begin
+      Pair.WhitePlayer := P2.Context;
+      Pair.WhiteLogin  := P2.Login;
+      Pair.BlackPlayer := P1.Context;
+      Pair.BlackLogin  := P1.Login;
+      Pair.WhiteID := P2.ID;
+      Pair.BlackID := P1.ID;
+    end;
+
+    // Usuwamy z listy oczekujących
+    WaitingPlayers.Delete(1);
+    WaitingPlayers.Delete(0);
+
+    // Dodajemy do aktywnych par
+    ActivePairs.Add(Pair);
+  finally
+    ListLock.Release;
+  end;
+
+  // Informujemy obydwu graczy
+  Log(Format('Para utworzona: %s (WHITE) vs %s (BLACK)', [Pair.WhiteLogin, Pair.BlackLogin]));
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('START');
+  Log('Wysłano do '+Pair.WhiteLogin+': START');
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('COLOR:WHITE');
+  Log('Wysłano do '+Pair.WhiteLogin+': COLOR:WHITE');
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('OPPONENT:' + Pair.BlackLogin);
+  Log('Wysłano do '+Pair.WhiteLogin+': OPPONENT:'+Pair.BlackLogin);
+
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('ID:' + Pair.BlackID.ToString);
+
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('START');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('COLOR:BLACK');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('OPPONENT:' + Pair.WhiteLogin);
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('ID:' + Pair.WhiteID.ToString);
+
+end;
+
+-}
+
+/// Sprawdza, czy dany kontekst jest w jakiejś aktywnej parze
+function TForm10.IsPlayerPaired(Player: TIdContext): Boolean;
+var
+  Pair: TPlayerPair;
+begin
+  ListLock.Acquire;
+  try
+    for Pair in ActivePairs do
+      if (Pair.WhitePlayer = Player) or (Pair.BlackPlayer = Player) then
+        Exit(True);
+  finally
+    ListLock.Release;
+  end;
+  Result := False;
+end;
+
+/// Znajduje strukturę pary zawierającą danego gracza
+function TForm10.FindPairWithPlayer(Player: TIdContext): TPlayerPair;
+var
+  Pair: TPlayerPair;
+begin
+  ListLock.Acquire;
+  try
+    for Pair in ActivePairs do
+      if (Pair.WhitePlayer = Player) or (Pair.BlackPlayer = Player) then
+        Exit(Pair);
+  finally
+    ListLock.Release;
+  end;
+
+  // Jeśli nie znaleziono, zwracamy "pustą" parę
+  Result.WhitePlayer := nil;
+  Result.BlackPlayer := nil;
+end;
+
+/// Wysyła ruch do przeciwnika, dodając prefix OPPONENT_MOVE:
+procedure TForm10.BroadcastToOpponent(SenderClient: TIdContext; const Msg: string);
+var
+  Pair: TPlayerPair;
+  Forwarded: string;
+begin
+  Pair := FindPairWithPlayer(SenderClient);
+  if Pair.WhitePlayer = nil then
+    Exit;
+
+  Forwarded := 'OPPONENT_MOVE:' + Msg;
+  Log('Forwarduję ruch: ' + Forwarded);
+
+  if SenderClient = Pair.WhitePlayer then
+    Pair.BlackPlayer.Connection.IOHandler.WriteLn(Forwarded)
+  else
+    Pair.WhitePlayer.Connection.IOHandler.WriteLn(Forwarded);
+end;
+
+
+
+procedure TForm10.BroadcastPromotion(SenderClient: TIdContext; const Msg: string);
+
+var
+  Pair: TPlayerPair;
+begin
+  Pair := FindPairWithPlayer(SenderClient);
+  if Pair.WhitePlayer = nil then Exit;
+
+  // Jeśli to biały wysłał PROMO ➜ do czarnego i odwrotnie
+  if SenderClient = Pair.WhitePlayer then
+    Pair.BlackPlayer.Connection.IOHandler.WriteLn('OPPONENT_PROMO:' + Msg)
+  else
+    Pair.WhitePlayer.Connection.IOHandler.WriteLn('OPPONENT_PROMO:' + Msg);
+
+  Log('Forwarduję promocję: ' + Msg);
+
+end;
+
+
+
+procedure TForm10.BroadcastEndgame(SenderClient: TIdContext; const Msg: string);
+begin
+
+var
+  Pair: TPlayerPair;
+begin
+  Pair := FindPairWithPlayer(SenderClient);
+  if Pair.WhitePlayer = nil then Exit;
+
+  // Jeśli to biały wysłał PROMO ➜ do czarnego i odwrotnie
+
+  if Msg='LOSE' then
+
+  begin
+
+  if SenderClient = Pair.WhitePlayer then
+  begin
+   Pair.BlackPlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
+  // IdTCPServer1Disconnect(Pair.WhitePlayer);
+   //IdTCPServer1Disconnect(Pair.BlackPlayer)
+  end
+
+
+  else
+  begin
+   Pair.WhitePlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
+  // IdTCPServer1Disconnect(Pair.WhitePlayer);
+   //IdTCPServer1Disconnect(Pair.BlackPlayer)
+  end;
+
+
+  end;
+
+
+
+
+
+end;
+
+
+
+
+
+end;
+
+
+{{
+procedure TForm10.IdTCPServer1Execute(AContext: TIdContext);
+var
+  Msg: string;
+  Info: TPlayerInfo;
+  temp: string;
+  PromoCode: string;
+begin
+  // Blokujące czytanie linii – czekamy na wiadomość
+  Msg := AContext.Connection.IOHandler.ReadLn;
+  Log('Odebrano od ' + AContext.Binding.PeerIP + ': ' + Msg);
+
+  if Msg.StartsWith('LOGIN:') then
+  begin
+  Info.Context := AContext;
+  Info.Login   := Msg.Substring(6);
+  Log('LOGIN: ' + Info.Login);
+
+
+  // Czytamy drugą linię z ID
+  Msg := AContext.Connection.IOHandler.ReadLn;
+  if Msg.StartsWith('ID:') then
+  begin
+    Info.ID := StrToIntDef(Msg.Substring(3), 0);
+    Log('ID: ' + Info.ID.ToString);
+  end;
+
+  ListLock.Acquire;
+  try
+    WaitingPlayers.Add(Info);
+    Log('Dodano do kolejki: ' + Info.Login + ' (teraz ' + WaitingPlayers.Count.ToString + ' graczy)');
+  finally
+    ListLock.Release;
+  end;
+
+  TryPairPlayers;
+  Exit;
+end;
+
+  if Msg.StartsWith('PROMO:') then
+
+  begin
+  PromoCode:= Msg.Substring(6);
+  Log('Promotion from '+AContext.Binding.PeerIP+': '+PromoCode);
+  BroadcastPromotion(AContext, PromoCode);
+  Exit;
+  end;
+
+
+
+  if Msg.StartsWith('ENDGAME:') then
+
+  begin
+  temp:= Msg.Substring(8);
+
+
+  if temp='WIN' then
+
+  begin
+  BroadcastEndgame(AContext, 'LOSE');
+  EXIT
+  end
+
+  else if temp='LOSE' then
+
+  begin
+   BroadcastEndgame(AContext, 'WIN');
+   EXIT
+  end
+
+  else if temp='DRAW' then
+  begin
+   BroadcastEndgame(AContext, 'DRAW');
+   EXIT
+  end;
+
+
+
+
+  end;
+
+
+  // Jeśli gracz już w parze, forwardujemy ruch
+  if IsPlayerPaired(AContext) then
+    BroadcastToOpponent(AContext, Msg);
+end;
+
+-}
+
+
+
+
+procedure TForm10.IdTCPServer1Execute(AContext: TIdContext);
+var
+  Msg: string;
+  Info: TPlayerInfo;
+  mode: string;
+  temp: string;
+begin
+  // 1) Odczyt pierwszej linii: LOGIN
+  Msg := AContext.Connection.IOHandler.ReadLn;
+  Log('Odebrano od ' + AContext.Binding.PeerIP + ': ' + Msg);
+
+  if Msg.StartsWith('LOGIN:') then
+  begin
+    // parsujemy login
+    Info.Context := AContext;
+    Info.Login   := Msg.Substring(6);
+
+    // 2) Odczyt ID
+    Msg := AContext.Connection.IOHandler.ReadLn;
+    Log('Odebrano: ' + Msg);
+    if not Msg.StartsWith('ID:') then
+    begin
+      Log('Błędny protokół – oczekiwano ID:, dostałem: ' + Msg);
+      Exit;
+    end;
+    Info.ID := StrToIntDef(Msg.Substring(3), 0);
+
+    // 3) Odczyt MODE
+    Msg := AContext.Connection.IOHandler.ReadLn;
+    Log('Odebrano: ' + Msg);
+    if not Msg.StartsWith('MODE:') then
+    begin
+      Log('Błędny protokół – oczekiwano MODE:, dostałem: ' + Msg);
+      Exit;
+    end;
+    mode := UpperCase(Msg.Substring(5)); // bez spacji
+
+    // 4) Dodajemy do odpowiedniej kolejki
+    ListLock.Acquire;
+    try
+      if mode = '1' then
+        WaitingRapid.Add(Info)
+      else if mode = '2' then
+        WaitingBlitz.Add(Info)
+      else if mode = '3' then
+        WaitingBullet.Add(Info)
+      else
+        Log('Nieznany tryb gry: ' + mode);
+    finally
+      ListLock.Release;
+    end;
+
+    // 5) Próbujemy od razu parować w tej kolejce
+    if mode = '1' then
+      TryPairRapid
+    else if mode = '2' then
+      TryPairBlitz
+    else if mode = '3' then
+      TryPairBullet;
+
+    Exit;
+  end;
+
+  // 6) Jeśli nie był to LOGIN, to sprawdzamy czy jest w parze
+  if not IsPlayerPaired(AContext) then
+    Exit;
+
+  // 7) Wysłanie dalej ruchów, promocji, zakończenia gry
+  Msg := Msg.Trim; // może mieć pozostałe spacje
+  if Msg.StartsWith('PROMO:') then
+    BroadcastPromotion(AContext, Msg.Substring(6))
+  else if Msg.StartsWith('ENDGAME:') then
+
+  begin
+  temp:= Msg.Substring(8);
+
+
+  if temp='WIN' then
+
+  begin
+  BroadcastEndgame(AContext, 'LOSE');
+  EXIT
+  end
+
+  else if temp='LOSE' then
+
+  begin
+   BroadcastEndgame(AContext, 'WIN');
+   EXIT
+  end
+
+  else if temp='DRAW' then
+  begin
+   BroadcastEndgame(AContext, 'DRAW');
+   EXIT
+  end;
+
+
+  end
+
+
+  else
+    BroadcastToOpponent(AContext, Msg);
+end;
+
+
+
+
+
+end.
+

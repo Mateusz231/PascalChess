@@ -1,0 +1,14 @@
+object LeaderboardForm: TLeaderboardForm
+  Left = 0
+  Top = 0
+  Caption = 'Leaderboards'
+  ClientHeight = 848
+  ClientWidth = 1123
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -12
+  Font.Name = 'Segoe UI'
+  Font.Style = []
+  TextHeight = 15
+end

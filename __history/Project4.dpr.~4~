@@ -1,0 +1,21 @@
+program Project4;
+
+uses
+  Vcl.Forms,
+  Unit3 in 'Unit3.pas' {Chess},
+  Unit4 in 'Unit4.pas' {Menu},
+  Unit5 in 'Unit5.pas' {RegisterMenu},
+  Unit6 in 'Unit6.pas' {Login},
+  UserSession in 'UserSession.pas';
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.MainFormOnTaskbar := True;
+  Application.CreateForm(TMenu, Menu);
+  Application.CreateForm(TChess, Chess);
+  Application.CreateForm(TRegisterMenu, RegisterMenu);
+  Application.CreateForm(TLogin, Login);
+  Application.Run;
+end.

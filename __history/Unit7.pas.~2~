@@ -1,0 +1,201 @@
+unit Unit7;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.Menus;
+
+type
+  TProfile = class(TForm)
+    LabelLogin: TLabel;
+    LabelFirstname: TLabel;
+    LabelLastname: TLabel;
+    LabelCountry: TLabel;
+    LabelCreationDate: TLabel;
+    ValueLogin: TLabel;
+    ValueFirstname: TLabel;
+    ValueLastname: TLabel;
+    ValueCountry: TLabel;
+    ValueCreationDate: TLabel;
+
+    LabelRankingRapid: TLabel;
+    LabelRapid: TLabel;
+    LabelRankingBlitz: TLabel;
+    LabelBlitz: TLabel;
+    LabelRankingBullet: TLabel;
+    LabelBullet: TLabel;
+
+    EditButton: TButton;
+    SaveButton: TButton;
+
+    EditFirstname: TEdit;
+    EditLastname: TEdit;
+    EditCountry: TEdit;
+
+    procedure FormCreate(Sender: TObject);
+    procedure FormResize(Sender: TObject);
+    procedure EditButtonClick(Sender: TObject);
+    procedure SaveButtonClick(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+
+  private
+    procedure SetupLabels;
+    procedure SetEditMode(AEditing: Boolean);
+  public
+    procedure LoadProfileData;
+  end;
+
+var
+  Profile: TProfile;
+
+implementation
+
+{$R *.dfm}
+
+uses UserSession;
+
+procedure TProfile.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  Application.Terminate;
+end;
+
+procedure TProfile.FormCreate(Sender: TObject);
+begin
+  Color := clBlack;
+  SetupLabels;
+  LoadProfileData;
+  SetEditMode(False);
+end;
+
+procedure TProfile.SetupLabels;
+var
+  AllLabels: array[0..14] of TLabel;
+  i: Integer;
+begin
+  AllLabels[0] := LabelLogin;
+  AllLabels[1] := LabelFirstname;
+  AllLabels[2] := LabelLastname;
+  AllLabels[3] := LabelCountry;
+  AllLabels[4] := LabelCreationDate;
+  AllLabels[5] := ValueLogin;
+  AllLabels[6] := ValueFirstname;
+  AllLabels[7] := ValueLastname;
+  AllLabels[8] := ValueCountry;
+  AllLabels[9] := ValueCreationDate;
+  AllLabels[10] := LabelRankingRapid;
+  AllLabels[11] := LabelRapid;
+  AllLabels[12] := LabelRankingBlitz;
+  AllLabels[13] := LabelBlitz;
+  AllLabels[14] := LabelRankingBullet;
+
+  for i := 0 to High(AllLabels) do
+  begin
+    AllLabels[i].Font.Color := clWhite;
+    AllLabels[i].Font.Size := 12;
+    AllLabels[i].Transparent := True;
+  end;
+
+  LabelBullet.Font.Color := clWhite;
+  LabelBullet.Font.Size := 12;
+  LabelBullet.Transparent := True;
+
+  EditButton.Caption := 'Edytuj';
+  SaveButton.Caption := 'Zapisz';
+end;
+
+procedure TProfile.LoadProfileData;
+begin
+  ValueLogin.Caption := UserSession.LoggedUserLogin;
+  ValueFirstname.Caption := 'Jan';       // <- tu póŸniej pobierzesz z bazy
+  ValueLastname.Caption := 'Kowalski';
+  ValueCountry.Caption := 'Poland';
+  ValueCreationDate.Caption := '2025-04-24';
+
+  LabelRankingRapid.Caption := 'Ranking Rapid:';
+  LabelRapid.Caption := '1500';
+
+  LabelRankingBlitz.Caption := 'Ranking Blitz:';
+  LabelBlitz.Caption := '1400';
+
+  LabelRankingBullet.Caption := 'Ranking Bullet:';
+  LabelBullet.Caption := '1300';
+end;
+
+procedure TProfile.SetEditMode(AEditing: Boolean);
+begin
+  EditFirstname.Visible := AEditing;
+  EditLastname.Visible := AEditing;
+  EditCountry.Visible := AEditing;
+
+  ValueFirstname.Visible := not AEditing;
+  ValueLastname.Visible := not AEditing;
+  ValueCountry.Visible := not AEditing;
+
+  SaveButton.Visible := AEditing;
+  EditButton.Visible := not AEditing;
+
+  if AEditing then
+  begin
+    EditFirstname.Text := ValueFirstname.Caption;
+    EditLastname.Text := ValueLastname.Caption;
+    EditCountry.Text := ValueCountry.Caption;
+  end;
+end;
+
+procedure TProfile.EditButtonClick(Sender: TObject);
+begin
+  SetEditMode(True);
+end;
+
+procedure TProfile.SaveButtonClick(Sender: TObject);
+begin
+  ValueFirstname.Caption := EditFirstname.Text;
+  ValueLastname.Caption := EditLastname.Text;
+  ValueCountry.Caption := EditCountry.Text;
+
+  SetEditMode(False);
+end;
+
+procedure TProfile.FormResize(Sender: TObject);
+var
+  spacing, startX, startY, labelWidth, valueWidth, labelHeight: Integer;
+begin
+  spacing := 20;
+  labelWidth := 140;
+  valueWidth := 200;
+  labelHeight := 30;
+  startX := (ClientWidth - (labelWidth + valueWidth + spacing)) div 2;
+  startY := 60;
+
+  LabelLogin.SetBounds(startX, startY, labelWidth, labelHeight);
+  ValueLogin.SetBounds(startX + labelWidth + spacing, startY, valueWidth, labelHeight);
+
+  LabelFirstname.SetBounds(startX, startY + (labelHeight + spacing), labelWidth, labelHeight);
+  ValueFirstname.SetBounds(startX + labelWidth + spacing, LabelFirstname.Top, valueWidth, labelHeight);
+  EditFirstname.SetBounds(ValueFirstname.Left, ValueFirstname.Top, valueWidth, labelHeight);
+
+  LabelLastname.SetBounds(startX, LabelFirstname.Top + (labelHeight + spacing), labelWidth, labelHeight);
+  ValueLastname.SetBounds(startX + labelWidth + spacing, LabelLastname.Top, valueWidth, labelHeight);
+  EditLastname.SetBounds(ValueLastname.Left, ValueLastname.Top, valueWidth, labelHeight);
+
+  LabelCountry.SetBounds(startX, LabelLastname.Top + (labelHeight + spacing), labelWidth, labelHeight);
+  ValueCountry.SetBounds(startX + labelWidth + spacing, LabelCountry.Top, valueWidth, labelHeight);
+  EditCountry.SetBounds(ValueCountry.Left, ValueCountry.Top, valueWidth, labelHeight);
+
+  LabelCreationDate.SetBounds(startX, LabelCountry.Top + (labelHeight + spacing), labelWidth, labelHeight);
+  ValueCreationDate.SetBounds(startX + labelWidth + spacing, LabelCreationDate.Top, valueWidth, labelHeight);
+
+  LabelRankingRapid.SetBounds(startX, LabelCreationDate.Top + (labelHeight + spacing * 2), labelWidth + valueWidth + spacing, labelHeight);
+
+  LabelRapid.SetBounds(startX, LabelRankingRapid.Top + (labelHeight + spacing div 2), labelWidth + valueWidth + spacing, labelHeight);
+  LabelRankingBlitz.SetBounds(startX, LabelRapid.Top + (labelHeight + spacing div 2), labelWidth + valueWidth + spacing, labelHeight);
+  LabelBlitz.SetBounds(startX, LabelRankingBlitz.Top + (labelHeight + spacing div 2), labelWidth + valueWidth + spacing, labelHeight);
+  LabelRankingBullet.SetBounds(startX, LabelBlitz.Top + (labelHeight + spacing div 2), labelWidth + valueWidth + spacing, labelHeight);
+  LabelBullet.SetBounds(startX, LabelRankingBullet.Top + (labelHeight + spacing div 2), labelWidth + valueWidth + spacing, labelHeight);
+
+  EditButton.SetBounds(ClientWidth div 2 - 100, LabelBullet.Top + (labelHeight + spacing * 2), 80, 40);
+  SaveButton.SetBounds(ClientWidth div 2 + 20, LabelBullet.Top + (labelHeight + spacing * 2), 80, 40);
+end;
+
+end.

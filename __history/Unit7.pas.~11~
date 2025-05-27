@@ -1,0 +1,326 @@
+unit Unit7;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
+  FireDAC.Stan.Intf, FireDAC.Stan.Option, FireDAC.Stan.Param,
+  FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf, FireDAC.DApt.Intf,
+  FireDAC.Stan.Async, FireDAC.DApt, Data.DB, FireDAC.Comp.DataSet,
+  FireDAC.Comp.Client, FireDAC.UI.Intf, FireDAC.Stan.Def, FireDAC.Stan.Pool,
+  FireDAC.Phys, FireDAC.Phys.MySQL, FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait;
+
+type
+  TProfile = class(TForm)
+    LabelLogin: TLabel;
+    LabelFirstname: TLabel;
+    LabelLastname: TLabel;
+    LabelCountry: TLabel;
+    LabelCreationDate: TLabel;
+    ValueLogin: TLabel;
+    ValueFirstname: TLabel;
+    ValueLastname: TLabel;
+    ValueCountry: TLabel;
+    ValueCreationDate: TLabel;
+
+    LabelRapid: TLabel;
+    LabelBlitz: TLabel;
+    LabelBullet: TLabel;
+
+    EditButton: TButton;
+    SaveButton: TButton;
+
+    EditFirstname: TEdit;
+    EditLastname: TEdit;
+    EditCountry: TEdit;
+    FDQuery1: TFDQuery;
+    FDConnection1: TFDConnection;
+    FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink;
+
+    procedure FormCreate(Sender: TObject);
+    procedure FormResize(Sender: TObject);
+    procedure EditButtonClick(Sender: TObject);
+    procedure SaveButtonClick(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormShow(Sender: TObject);
+
+  private
+    PanelProfile, PanelRatings: TPanel;
+    procedure SetupLabels;
+    procedure SetEditMode(AEditing: Boolean);
+    procedure SetupPanels;
+  public
+    procedure LoadProfileData;
+  end;
+
+var
+  Profile: TProfile;
+
+implementation
+
+{$R *.dfm}
+
+uses UserSession;
+
+procedure TProfile.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  Application.Terminate;
+end;
+
+procedure TProfile.FormCreate(Sender: TObject);
+begin
+  Color := $00202020; // ciemnoszare t³o
+  Font.Name := 'Segoe UI';
+  Font.Size := 10;
+  SetupPanels;
+  SetupLabels;
+  SetEditMode(False);
+end;
+
+procedure TProfile.SetupPanels;
+begin
+  PanelProfile := TPanel.Create(Self);
+  PanelProfile.Parent := Self;
+  PanelProfile.Color := $00303030;
+  PanelProfile.BevelOuter := bvNone;
+  PanelProfile.SetBounds(50, 50, ClientWidth - 100, 250);
+
+  PanelRatings := TPanel.Create(Self);
+  PanelRatings.Parent := Self;
+  PanelRatings.Color := $00303030;
+  PanelRatings.BevelOuter := bvNone;
+  PanelRatings.SetBounds(50, PanelProfile.Top + PanelProfile.Height + 20, ClientWidth - 100, 140);
+
+  // Przypisanie Parent dla labeli
+  LabelLogin.Parent := PanelProfile;
+  ValueLogin.Parent := PanelProfile;
+  LabelFirstname.Parent := PanelProfile;
+  ValueFirstname.Parent := PanelProfile;
+  EditFirstname.Parent := PanelProfile;
+  LabelLastname.Parent := PanelProfile;
+  ValueLastname.Parent := PanelProfile;
+  EditLastname.Parent := PanelProfile;
+  LabelCountry.Parent := PanelProfile;
+  ValueCountry.Parent := PanelProfile;
+  EditCountry.Parent := PanelProfile;
+  LabelCreationDate.Parent := PanelProfile;
+  ValueCreationDate.Parent := PanelProfile;
+
+  LabelRapid.Parent := PanelRatings;
+  LabelBlitz.Parent := PanelRatings;
+  LabelBullet.Parent := PanelRatings;
+
+  EditButton.Parent := Self;
+  SaveButton.Parent := Self;
+end;
+
+procedure TProfile.SetupLabels;
+var
+  AllLabels: array[0..12] of TLabel;
+  i: Integer;
+begin
+  AllLabels[0] := LabelLogin;
+  AllLabels[1] := LabelFirstname;
+  AllLabels[2] := LabelLastname;
+  AllLabels[3] := LabelCountry;
+  AllLabels[4] := LabelCreationDate;
+  AllLabels[5] := ValueLogin;
+  AllLabels[6] := ValueFirstname;
+  AllLabels[7] := ValueLastname;
+  AllLabels[8] := ValueCountry;
+  AllLabels[9] := ValueCreationDate;
+  AllLabels[10] := LabelRapid;
+  AllLabels[11] := LabelBlitz;
+  AllLabels[12] := LabelBullet;
+
+  for i := 0 to High(AllLabels) do
+  begin
+    AllLabels[i].Font.Color := clWhite;
+    AllLabels[i].Font.Size := 12;
+    AllLabels[i].Transparent := True;
+  end;
+
+
+
+   LabelLogin.Caption := 'Login:';
+  LabelFirstname.Caption := 'Name:';
+  LabelLastname.Caption := 'Lastname:';
+  LabelCountry.Caption := 'Country:';
+  LabelCreationDate.Caption := 'Account creation date: ';
+
+
+  EditButton.Caption := 'Edytuj';
+  SaveButton.Caption := 'Zapisz';
+
+ // EditButton.Color := $004080FF; // niebieski
+ // SaveButton.Color := $004080FF;
+  EditButton.Font.Color := clWhite;
+  SaveButton.Font.Color := clWhite;
+  EditButton.Font.Style := [fsBold];
+  SaveButton.Font.Style := [fsBold];
+end;
+
+procedure TProfile.LoadProfileData;
+var
+  query: TFDQuery;
+begin
+  query := TFDQuery.Create(nil);
+  try
+    query.Connection := FDConnection1;
+
+    query.SQL.Text := 'SELECT creation_date, country, firstname, lastname FROM users WHERE userid = :userid';
+    query.ParamByName('userid').AsInteger := UserSession.LoggedUserID;
+    query.Open;
+
+    if not query.IsEmpty then
+    begin
+      ValueLogin.Caption := UserSession.LoggedUserLogin;
+      ValueFirstname.Caption := query.FieldByName('firstname').AsString;
+      ValueLastName.Caption := query.FieldByName('lastname').AsString;
+      ValueCountry.Caption := query.FieldByName('country').AsString;
+      ValueCreationDate.Caption := query.FieldByName('creation_date').AsString;
+    end
+    else
+      ShowMessage('B³¹d podczas pobierania danych profilu!');
+
+    query.Close;
+
+    query.SQL.Text := 'SELECT rating, game_type_id FROM rankings WHERE users_userid = :userid';
+    query.ParamByName('userid').AsInteger := UserSession.LoggedUserID;
+    query.Open;
+
+    LabelRapid.Caption := 'Rapid: 1200';
+    LabelBlitz.Caption := 'Blitz: 1200';
+    LabelBullet.Caption := 'Bullet: 1200';
+
+    while not query.Eof do
+    begin
+      case query.FieldByName('game_type_id').AsInteger of
+        1: LabelRapid.Caption := 'Rapid: ' + query.FieldByName('rating').AsString;
+        2: LabelBlitz.Caption := 'Blitz: ' + query.FieldByName('rating').AsString;
+        3: LabelBullet.Caption := 'Bullet: ' + query.FieldByName('rating').AsString;
+      end;
+      query.Next;
+    end;
+  finally
+    query.Free;
+  end;
+end;
+
+procedure TProfile.SetEditMode(AEditing: Boolean);
+begin
+  EditFirstname.Visible := AEditing;
+  EditLastname.Visible := AEditing;
+  EditCountry.Visible := AEditing;
+
+  ValueFirstname.Visible := not AEditing;
+  ValueLastname.Visible := not AEditing;
+  ValueCountry.Visible := not AEditing;
+
+  SaveButton.Visible := AEditing;
+  EditButton.Visible := not AEditing;
+
+  if AEditing then
+  begin
+  //  ValueFirstname.Caption:= 'aaaaa';
+    EditFirstname.Text := ValueFirstname.Caption;
+    EditLastname.Text := ValueLastname.Caption;
+    EditCountry.Text := ValueCountry.Caption;
+  end;
+end;
+
+procedure TProfile.EditButtonClick(Sender: TObject);
+begin
+  SetEditMode(True);
+end;
+
+procedure TProfile.SaveButtonClick(Sender: TObject);
+var
+Query: TFDQuery;
+begin
+
+
+
+
+  ValueFirstname.Caption := EditFirstname.Text;
+  ValueLastname.Caption := EditLastname.Text;
+  ValueCountry.Caption := EditCountry.Text;
+
+   Query := TFDQuery.Create(nil);
+  try
+    Query.Connection := FDConnection1; // <- tutaj wstaw swoj¹ zmienn¹ po³¹czenia!
+
+    Query.SQL.Text :=
+  'UPDATE users ' +
+  'SET firstname = :firstname, ' +
+  '    lastname = :lastname, ' +
+  '    country = :country, ' +
+  '    last_modified = :last_modified, ' +
+  '    who_modified = :who_modified ' +
+  'WHERE userid = :userid';
+
+
+    Query.ParamByName('firstname').AsString := EditFirstname.Text;
+    Query.ParamByName('lastname').AsString  := EditLastname.Text;
+    Query.ParamByName('country').AsString   := EditCountry.Text;
+    Query.ParamByName('last_modified').AsDateTime:= Now;
+    Query.ParamByName('who_modified').AsInteger := UserSession.LoggedUserID;
+    Query.ParamByName('userid').AsInteger        := UserSession.LoggedUserID; // <- tutaj Twoje ID u¿ytkownika
+
+    Query.ExecSQL;
+  finally
+    Query.Free;
+  end;
+
+
+
+  SetEditMode(False);
+end;
+
+procedure TProfile.FormResize(Sender: TObject);
+var
+  spacing, startX, startY, labelWidth, valueWidth, labelHeight: Integer;
+begin
+  spacing := 15;
+  labelWidth := 120;
+  valueWidth := 200;
+  labelHeight := 24;
+  startX := 30;
+  startY := 20;
+
+  LabelLogin.SetBounds(startX, startY, labelWidth, labelHeight);
+  ValueLogin.SetBounds(startX + labelWidth + spacing, startY, valueWidth, labelHeight);
+
+  LabelFirstname.SetBounds(startX, startY + (labelHeight + spacing), labelWidth, labelHeight);
+  ValueFirstname.SetBounds(startX + labelWidth + spacing, LabelFirstname.Top, valueWidth, labelHeight);
+  EditFirstname.SetBounds(ValueFirstname.Left, ValueFirstname.Top, valueWidth, labelHeight);
+
+  LabelLastname.SetBounds(startX, LabelFirstname.Top + (labelHeight + spacing), labelWidth, labelHeight);
+  ValueLastname.SetBounds(startX + labelWidth + spacing, LabelLastname.Top, valueWidth, labelHeight);
+  EditLastname.SetBounds(ValueLastname.Left, ValueLastname.Top, valueWidth, labelHeight);
+
+  LabelCountry.SetBounds(startX, LabelLastname.Top + (labelHeight + spacing), labelWidth, labelHeight);
+  ValueCountry.SetBounds(startX + labelWidth + spacing, LabelCountry.Top, valueWidth, labelHeight);
+  EditCountry.SetBounds(ValueCountry.Left, ValueCountry.Top, valueWidth, labelHeight);
+
+  LabelCreationDate.SetBounds(startX, LabelCountry.Top + (labelHeight + spacing), labelWidth, labelHeight);
+  ValueCreationDate.SetBounds(startX + labelWidth + spacing, LabelCreationDate.Top, valueWidth, labelHeight);
+
+  LabelRapid.SetBounds(20, 20, PanelRatings.Width - 40, labelHeight);
+  LabelBlitz.SetBounds(20, LabelRapid.Top + labelHeight + spacing, PanelRatings.Width - 40, labelHeight);
+  LabelBullet.SetBounds(20, LabelBlitz.Top + labelHeight + spacing, PanelRatings.Width - 40, labelHeight);
+
+  EditButton.SetBounds(ClientWidth div 2 - 100, PanelRatings.Top + PanelRatings.Height + 20, 80, 40);
+  SaveButton.SetBounds(ClientWidth div 2 + 20, PanelRatings.Top + PanelRatings.Height + 20, 80, 40);
+end;
+
+procedure TProfile.FormShow(Sender: TObject);
+begin
+
+  LoadProfileData;
+
+
+end;
+
+end.

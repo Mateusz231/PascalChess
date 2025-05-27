@@ -1,0 +1,154 @@
+unit Unit8;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Grids,
+  FireDAC.Comp.Client, FireDAC.Stan.Intf, FireDAC.Stan.Option, FireDAC.Stan.Param,
+  FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf, FireDAC.DApt.Intf,
+  FireDAC.Stan.Async, FireDAC.DApt, Data.DB;
+
+type
+  TLeaderboardForm = class(TForm)
+    cboGameType: TComboBox;
+    GridLeaderboard: TStringGrid;
+    BtnPrevPage: TButton;
+    BtnNextPage: TButton;
+    LblPageInfo: TLabel;
+    FDQuery: TFDQuery;
+    FDConnection: TFDConnection;
+
+    procedure FormCreate(Sender: TObject);
+    procedure cboGameTypeChange(Sender: TObject);
+    procedure BtnPrevPageClick(Sender: TObject);
+    procedure BtnNextPageClick(Sender: TObject);
+  private
+    FPage: Integer;
+    const
+      RecordsPerPage = 15;
+    procedure LoadLeaderboard;
+    function GetSelectedGameTypeID: Integer;
+    procedure UpdatePageInfo;
+    procedure SetupGrid;
+  public
+    { Public declarations }
+  end;
+
+var
+  LeaderboardForm: TLeaderboardForm;
+
+implementation
+
+{$R *.dfm}
+
+procedure TLeaderboardForm.FormCreate(Sender: TObject);
+begin
+  Color := clBlack;
+
+  // Wype³nij ComboBox
+  cboGameType.Items.Add('Rapid');
+  cboGameType.Items.Add('Blitz');
+  cboGameType.Items.Add('Bullet');
+  cboGameType.ItemIndex := 0; // domyœlnie Rapid
+
+  FPage := 0;
+
+  SetupGrid;
+  LoadLeaderboard;
+end;
+
+procedure TLeaderboardForm.SetupGrid;
+begin
+  GridLeaderboard.RowCount := RecordsPerPage + 1; // +1 na nag³ówki
+  GridLeaderboard.ColCount := 4;
+
+  GridLeaderboard.Cells[0, 0] := 'Lp.';
+  GridLeaderboard.Cells[1, 0] := 'Login';
+  GridLeaderboard.Cells[2, 0] := 'Country';
+  GridLeaderboard.Cells[3, 0] := 'Rating';
+
+  GridLeaderboard.FixedRows := 1;
+  GridLeaderboard.Options := GridLeaderboard.Options + [goRowSelect];
+end;
+
+procedure TLeaderboardForm.LoadLeaderboard;
+var
+  Offset: Integer;
+begin
+  Offset := FPage * RecordsPerPage;
+
+  FDQuery.Close;
+  FDQuery.SQL.Text :=
+    'SELECT u.firstname, u.lastname, u.country, r.rating ' +
+    'FROM users u ' +
+    'JOIN rankings r ON u.userid = r.users_userid ' +
+    'WHERE r.game_type_id = :game_type_id ' +
+    'ORDER BY r.rating DESC ' +
+    'LIMIT :limit OFFSET :offset';
+
+  FDQuery.ParamByName('game_type_id').AsInteger := GetSelectedGameTypeID;
+  FDQuery.ParamByName('limit').AsInteger := RecordsPerPage;
+  FDQuery.ParamByName('offset').AsInteger := Offset;
+  FDQuery.Open;
+
+  // Wyczyœæ stare dane
+  GridLeaderboard.RowCount := RecordsPerPage + 1;
+  GridLeaderboard.Rows[1].Clear;
+  GridLeaderboard.Rows[2].Clear;
+  GridLeaderboard.Rows[3].Clear;
+  // itd.
+
+  var i := 1;
+  while not FDQuery.Eof do
+  begin
+    GridLeaderboard.Cells[0, i] := IntToStr(Offset + i); // numeracja globalna
+    GridLeaderboard.Cells[1, i] := FDQuery.FieldByName('firstname').AsString + ' ' + FDQuery.FieldByName('lastname').AsString;
+    GridLeaderboard.Cells[2, i] := FDQuery.FieldByName('country').AsString;
+    GridLeaderboard.Cells[3, i] := FDQuery.FieldByName('rating').AsString;
+
+    Inc(i);
+    FDQuery.Next;
+  end;
+
+  UpdatePageInfo;
+end;
+
+procedure TLeaderboardForm.cboGameTypeChange(Sender: TObject);
+begin
+  FPage := 0;
+  LoadLeaderboard;
+end;
+
+procedure TLeaderboardForm.BtnPrevPageClick(Sender: TObject);
+begin
+  if FPage > 0 then
+  begin
+    Dec(FPage);
+    LoadLeaderboard;
+  end;
+end;
+
+procedure TLeaderboardForm.BtnNextPageClick(Sender: TObject);
+begin
+  Inc(FPage);
+  LoadLeaderboard;
+end;
+
+procedure TLeaderboardForm.UpdatePageInfo;
+begin
+  LblPageInfo.Caption := Format('Page: %d', [FPage + 1]);
+end;
+
+function TLeaderboardForm.GetSelectedGameTypeID: Integer;
+begin
+  case cboGameType.ItemIndex of
+    0: Result := 1; // Rapid
+    1: Result := 2; // Blitz
+    2: Result := 3; // Bullet
+  else
+    Result := 1;
+  end;
+end;
+
+end.

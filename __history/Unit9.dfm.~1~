@@ -1,0 +1,35 @@
+object MatchHistoryForm : TMatchHistoryForm
+  Left = 0
+  Top = 0
+  Caption = 'Match History'
+  ClientHeight = 845
+  ClientWidth = 1125
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -12
+  Font.Name = 'Segoe UI'
+  Font.Style = []
+  OnCreate = FormCreate
+  TextHeight = 15
+  object FDQuery1: TFDQuery
+    Left = 880
+    Top = 328
+  end
+  object FDConnection1: TFDConnection
+    Params.Strings = (
+      'Server=127.0.0.1'
+      'Database=pascalchess'
+      'User_Name=root'
+      'DriverID=MySQL')
+    Left = 880
+    Top = 392
+  end
+  object FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink
+    VendorLib = 
+      'C:\Users\Mateusz\Documents\Embarcadero\Studio\Projects\libmysql.' +
+      'dll'
+    Left = 880
+    Top = 464
+  end
+end

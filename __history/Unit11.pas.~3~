@@ -1,0 +1,63 @@
+unit Unit11;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.Imaging.jpeg, Vcl.ExtCtrls,
+  Vcl.StdCtrls;
+
+type
+  TGameType = class(TForm)
+    Image1: TImage;
+    Button1: TButton;
+    Button2: TButton;
+    Button3: TButton;
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure Button1Click(Sender: TObject);
+    procedure Button2Click(Sender: TObject);
+    procedure Button3Click(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  GameType: TGameType;
+
+implementation
+
+{$R *.dfm}
+
+uses unit3;
+
+procedure TGameType.Button1Click(Sender: TObject);
+begin
+Self.Hide;
+Chess.SetGameType(1);
+Chess.Show;
+end;
+
+procedure TGameType.Button2Click(Sender: TObject);
+begin
+Self.Hide;
+Chess.SetGameType(2);
+Chess.Show;
+end;
+
+procedure TGameType.Button3Click(Sender: TObject);
+begin
+Self.Hide;
+Chess.SetGameType(3);
+Chess.Show;
+end;
+
+procedure TGameType.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  //Application.Terminate;
+  Self.Hide;
+  Application.MainForm.Show;
+end;
+
+end.

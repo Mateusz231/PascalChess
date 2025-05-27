@@ -1,0 +1,60 @@
+object LeaderboardForm: TLeaderboardForm
+  Left = 0
+  Top = 0
+  Caption = 'Leaderboard'
+  ClientHeight = 400
+  ClientWidth = 700
+  Color = clBlack
+  OnCreate = FormCreate
+  OnResize = FormResize
+  OnClose = FormClose
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWhite
+  Font.Height = -11
+  Font.Name = 'Segoe UI'
+  Font.Style = []
+  OldCreateOrder = False
+  PixelsPerInch = 96
+  TextHeight = 13
+
+  object LblPageInfo: TLabel
+    Name = 'LblPageInfo'
+    Caption = 'Page: 1'
+    Font.Color = clWhite
+    Transparent = True
+  end
+
+  object GridLeaderboard: TStringGrid
+    Name = 'GridLeaderboard'
+    ColCount = 4
+    FixedRows = 1
+    RowCount = 16
+    DefaultColWidth = 120
+    FixedColor = clGray
+    Color = clWhite
+    ScrollBars = ssBoth
+    TabOrder = 0
+  end
+
+  object cboGameType: TComboBox
+    Name = 'cboGameType'
+    Style = csDropDownList
+    TabOrder = 1
+    OnChange = cboGameTypeChange
+  end
+
+  object BtnPrevPage: TButton
+    Name = 'BtnPrevPage'
+    Caption = 'Previous'
+    TabOrder = 2
+    OnClick = BtnPrevPageClick
+  end
+
+  object BtnNextPage: TButton
+    Name = 'BtnNextPage'
+    Caption = 'Next'
+    TabOrder = 3
+    OnClick = BtnNextPageClick
+  end
+
+end

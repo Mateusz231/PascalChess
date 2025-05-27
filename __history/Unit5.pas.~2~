@@ -1,0 +1,159 @@
+unit Unit5;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Imaging.jpeg,
+  Vcl.ExtCtrls, FireDAC.Stan.Intf, FireDAC.Stan.Option, FireDAC.Stan.Error,
+  FireDAC.UI.Intf, FireDAC.Phys.Intf, FireDAC.Stan.Def, FireDAC.Stan.Pool,
+  FireDAC.Stan.Async, FireDAC.Phys, FireDAC.VCLUI.Wait, Data.DB,
+  FireDAC.Comp.Client, FireDAC.Phys.MySQLDef, FireDAC.Phys.MySQL,
+  FireDAC.Stan.Param, FireDAC.DatS, FireDAC.DApt.Intf, FireDAC.DApt,
+  FireDAC.Comp.DataSet;
+
+type
+  TRegisterMenu = class(TForm)
+    RegisterButton: TButton;
+    BackButton: TButton;
+    Login: TEdit;
+    Password: TEdit;
+    LoginLabel: TLabel;
+    PasswordLabel: TLabel;
+    Image1: TImage;
+    FDConnection1: TFDConnection;
+    FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink;
+    FDQuery1: TFDQuery;
+    procedure BackButtonClick(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormCreate(Sender: TObject);
+    procedure FormResize(Sender: TObject);
+    procedure RegisterButtonClick(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  RegisterMenu: TRegisterMenu;
+
+implementation
+
+{$R *.dfm}
+
+procedure TRegisterMenu.BackButtonClick(Sender: TObject);
+begin
+Self.Hide;
+Application.MainForm.Show;
+
+end;
+
+procedure TRegisterMenu.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+Application.terminate;
+end;
+
+procedure TRegisterMenu.FormCreate(Sender: TObject);
+begin
+Image1.SendToBack;
+FormResize(self);
+end;
+
+procedure TRegisterMenu.FormResize(Sender: TObject);
+
+
+var
+  formCenterX, spacing, fieldHeight, labelHeight, buttonWidth, buttonHeight, startY: Integer;
+begin
+  spacing := 15;
+  fieldHeight := 40;
+  labelHeight := 20;
+  buttonWidth := 130;
+  buttonHeight := 40;
+  formCenterX := ClientWidth div 2;
+
+  // Start Y offset
+  startY := 60;
+
+  // Login label & edit
+  LoginLabel.Top := startY;
+  LoginLabel.Left := formCenterX - LoginLabel.Width div 2;
+
+  Login.Top := LoginLabel.Top + labelHeight + 5;
+  Login.Left := formCenterX - 150;
+  Login.Width := 300;
+  Login.Height := fieldHeight;
+
+  // Password label & edit
+  PasswordLabel.Top := Login.Top + fieldHeight + spacing;
+  PasswordLabel.Left := formCenterX - PasswordLabel.Width div 2;
+
+  PasswordLabel.Font.Color := clWhite;
+  LoginLabel.Font.Color := clWhite;
+
+  PasswordLabel.Font.Size := 14;
+  LoginLabel.Font.Size := 14;
+  PasswordLabel.Font.Style := [fsBold];
+  LoginLabel.Font.Style := [fsBold];
+
+
+  Password.Top := PasswordLabel.Top + labelHeight + 5;
+  Password.Left := formCenterX - 150;
+  Password.Width := 300;
+  Password.Height := fieldHeight;
+
+  // Buttons
+  RegisterButton.Top := Password.Top + fieldHeight + spacing * 2;
+  RegisterButton.Left := formCenterX - buttonWidth - spacing div 2;
+  RegisterButton.Width := buttonWidth;
+  RegisterButton.Height := buttonHeight;
+
+  BackButton.Top := RegisterButton.Top;
+  BackButton.Left := formCenterX + spacing div 2;
+  BackButton.Width := buttonWidth;
+  BackButton.Height := buttonHeight;
+
+
+end;
+
+procedure TRegisterMenu.RegisterButtonClick(Sender: TObject);
+var
+  login2, password2: string;
+begin
+  login2 := Trim(Login.Text);
+  password2 := Trim(Password.Text);
+
+  if (login2 = '') or (password2 = '') then
+  begin
+    ShowMessage('Login and password cannot be empty!');
+    Exit;
+  end;
+
+  // SprawdŸ, czy u¿ytkownik ju¿ istnieje
+  FDQuery1.SQL.Text := 'SELECT COUNT(*) FROM users WHERE login = :login';
+  FDQuery1.Params.ParamByName('login').AsString := login2;
+  FDQuery1.Open;
+
+  if FDQuery1.Fields[0].AsInteger > 0 then
+  begin
+    ShowMessage('User already exists.');
+    Exit;
+  end;
+
+  FDQuery1.Close;
+
+  // Wstaw nowego u¿ytkownika
+  FDQuery1.SQL.Text := 'INSERT INTO users (login, password) VALUES (:login, :password)';
+  FDQuery1.Params.ParamByName('login').AsString := login2;
+  FDQuery1.Params.ParamByName('password').AsString := password2; // Mo¿na zaszyfrowaæ w przysz³oœci
+  FDQuery1.ExecSQL;
+
+  ShowMessage('Registration successful!');
+  Self.Hide;
+  Application.MainForm.Show;
+end;
+
+
+
+end.

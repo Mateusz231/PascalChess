@@ -1,0 +1,18 @@
+unit UserSession;
+
+interface
+
+
+
+var
+LoggedUserID: Integer;
+LoggedUserLogin: string;
+Logged: boolean;
+
+
+
+implementation
+
+
+
+end.

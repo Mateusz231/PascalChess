@@ -1,0 +1,192 @@
+unit Unit9;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.Grids,
+  FireDAC.Comp.Client, Data.DB;
+
+type
+  TMatchHistoryForm = class(TForm)
+    GridMatchHistory: TStringGrid;
+    BtnPrevPage: TButton;
+    BtnNextPage: TButton;
+    LblPageInfo: TLabel;
+    FDQuery1: TFDQuery;
+    procedure FormCreate(Sender: TObject);
+    procedure BtnPrevPageClick(Sender: TObject);
+    procedure BtnNextPageClick(Sender: TObject);
+    procedure FormResize(Sender: TObject);
+  private
+    FPage: Integer;
+    const
+      RecordsPerPage = 15;
+    procedure LoadMatchHistory;
+    procedure UpdatePageInfo;
+    procedure SetupGrid;
+    procedure ResizeGridColumns;
+  public
+    { Public declarations }
+  end;
+
+var
+  MatchHistoryForm: TMatchHistoryForm;
+ // LoggedUserID: Integer; // <- zak³adam ¿e masz ju¿ to gdzieœ ustawione globalnie
+
+implementation
+
+{$R *.dfm}
+
+Uses UserSession;
+
+
+procedure TMatchHistoryForm.FormCreate(Sender: TObject);
+begin
+  Color := clBlack;
+  Font.Color := clWhite;
+  Font.Size := 10;
+
+  GridMatchHistory.Parent := Self;
+  GridMatchHistory.Top := 20;
+  GridMatchHistory.Left := 20;
+  GridMatchHistory.Width := ClientWidth - 40;
+  GridMatchHistory.Height := ClientHeight - 100;
+  GridMatchHistory.Color := clBlack;
+  GridMatchHistory.Font.Color := clWhite;
+  GridMatchHistory.FixedColor := clGray;
+  GridMatchHistory.Options := GridMatchHistory.Options + [goRowSelect];
+  GridMatchHistory.DefaultRowHeight := 28;
+  GridMatchHistory.FixedRows := 1;
+
+  BtnPrevPage := TButton.Create(Self);
+  BtnPrevPage.Parent := Self;
+  BtnPrevPage.Top := GridMatchHistory.Top + GridMatchHistory.Height + 10;
+  BtnPrevPage.Left := 20;
+  BtnPrevPage.Caption := 'Previous';
+  BtnPrevPage.OnClick := BtnPrevPageClick;
+
+  BtnNextPage := TButton.Create(Self);
+  BtnNextPage.Parent := Self;
+  BtnNextPage.Top := BtnPrevPage.Top;
+  BtnNextPage.Left := BtnPrevPage.Left + BtnPrevPage.Width + 10;
+  BtnNextPage.Caption := 'Next';
+  BtnNextPage.OnClick := BtnNextPageClick;
+
+  LblPageInfo := TLabel.Create(Self);
+  LblPageInfo.Parent := Self;
+  LblPageInfo.Top := BtnPrevPage.Top;
+  LblPageInfo.Left := BtnNextPage.Left + BtnNextPage.Width + 10;
+  LblPageInfo.Font.Color := clWhite;
+
+  FPage := 0;
+
+  SetupGrid;
+  LoadMatchHistory;
+end;
+
+procedure TMatchHistoryForm.SetupGrid;
+begin
+  GridMatchHistory.RowCount := RecordsPerPage + 1; // +1 na nag³ówek
+  GridMatchHistory.ColCount := 4;
+
+  GridMatchHistory.Cells[0, 0] := 'Lp.';
+  GridMatchHistory.Cells[1, 0] := 'Opponent';
+  GridMatchHistory.Cells[2, 0] := 'Result';
+  GridMatchHistory.Cells[3, 0] := 'Date';
+end;
+
+procedure TMatchHistoryForm.LoadMatchHistory;
+var
+  Offset: Integer;
+  i: Integer;
+begin
+  Offset := FPage * RecordsPerPage;
+
+  FDQuery1.Close;
+  FDQuery1.SQL.Text :=
+    'SELECT opponent_name, result, date_played ' +
+    'FROM matches ' +
+    'WHERE user_id = :user_id ' +
+    'ORDER BY date_played DESC ' +
+    'LIMIT :limit OFFSET :offset';
+
+  FDQuery1.ParamByName('user_id').AsInteger := LoggedUserID;
+  FDQuery1.ParamByName('limit').AsInteger := RecordsPerPage;
+  FDQuery1.ParamByName('offset').AsInteger := Offset;
+  FDQuery1.Open;
+
+  if FDQuery1.IsEmpty then
+  begin
+    if FPage > 0 then
+    begin
+      Dec(FPage);
+      LoadMatchHistory;
+    end;
+    Exit;
+  end;
+
+  // Wyczyœæ stare dane
+  for i := 1 to GridMatchHistory.RowCount - 1 do
+    GridMatchHistory.Rows[i].Clear;
+
+  i := 1;
+  while not FDQuery1.Eof do
+  begin
+    GridMatchHistory.Cells[0, i] := IntToStr(Offset + i);
+    GridMatchHistory.Cells[1, i] := FDQuery1.FieldByName('opponent_name').AsString;
+    GridMatchHistory.Cells[2, i] := FDQuery1.FieldByName('result').AsString;
+    GridMatchHistory.Cells[3, i] := FormatDateTime('yyyy-mm-dd', FDQuery1.FieldByName('date_played').AsDateTime);
+
+    Inc(i);
+    FDQuery1.Next;
+  end;
+
+  UpdatePageInfo;
+end;
+
+procedure TMatchHistoryForm.UpdatePageInfo;
+begin
+  LblPageInfo.Caption := Format('Page: %d', [FPage + 1]);
+end;
+
+procedure TMatchHistoryForm.BtnPrevPageClick(Sender: TObject);
+begin
+  if FPage > 0 then
+  begin
+    Dec(FPage);
+    LoadMatchHistory;
+  end;
+end;
+
+procedure TMatchHistoryForm.BtnNextPageClick(Sender: TObject);
+begin
+  Inc(FPage);
+  LoadMatchHistory;
+end;
+
+procedure TMatchHistoryForm.FormResize(Sender: TObject);
+begin
+  GridMatchHistory.Width := ClientWidth - 40;
+  GridMatchHistory.Height := ClientHeight - 100;
+  ResizeGridColumns;
+end;
+
+procedure TMatchHistoryForm.ResizeGridColumns;
+var
+  TotalWidth: Integer;
+  ColWidth: Integer;
+begin
+  if GridMatchHistory.ColCount = 4 then
+  begin
+    TotalWidth := GridMatchHistory.ClientWidth;
+    ColWidth := TotalWidth div 4;
+
+    GridMatchHistory.ColWidths[0] := ColWidth;
+    GridMatchHistory.ColWidths[1] := ColWidth;
+    GridMatchHistory.ColWidths[2] := ColWidth;
+    GridMatchHistory.ColWidths[3] := ColWidth;
+  end;
+end;
+
+end.

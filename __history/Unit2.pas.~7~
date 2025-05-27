@@ -1,0 +1,1104 @@
+﻿unit Unit2;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, Math, Vcl.StdCtrls, System.Generics.Collections, System.Types;
+
+type
+
+   TMove = record
+    FromRow, FromCol: Integer;
+    ToRow, ToCol: Integer;
+  end;
+  TForm2 = class(TForm)
+    Panel1: TPanel;
+    procedure FormCreate(Sender: TObject);
+
+
+
+  private
+    lastDoubleStepRow, lastDoubleStepCol: Integer;
+    BoardPanels: array[0..7, 0..7] of TPanel;
+    selectedRow, selectedCol: Integer;
+    whiteKingMoved, blackKingMoved: Boolean;
+    whiteLeftRookMoved, whiteRightRookMoved: Boolean;
+    blackLeftRookMoved, blackRightRookMoved: Boolean;
+    selected: Boolean;
+    promotionSelection: Integer;
+    currentPlayer: Char; // 'w' = biały, 'b' = czarny
+    procedure CreateBoard;
+    procedure PanelClick(Sender: TObject);
+    procedure UpdateBoardColors;
+    function IsPlayersPiece(const figura: string): Boolean;
+    function CanMoveLikeRook(startRow, startCol, endRow, endCol: Integer): Boolean;
+    function CanMoveLikeBishop(startRow, startCol, endRow, endCol: Integer): Boolean;
+    function PromotePawn(player: Char): string;
+    procedure PromoButtonClick(Sender: TObject);
+    function PromotePawnDialog(player: Char): string;
+    function IsLegalMove(piece: string; fromRow, fromCol, toRow, toCol: Integer): Boolean;
+    function GenerateLegalMoves(piece: string; row, col: Integer): TList<TPoint>;
+    function FindKing(player: Char): TPoint;
+    function IsKingInCheck(player: Char): Boolean;
+    function IsEnemyPiece(figura: string; player: Char): Boolean;
+    function IsMoveSafe(piece: string; fromRow, fromCol, toRow, toCol: Integer): Boolean;
+    function IsWhitePiece(piece: string): Boolean;
+
+
+
+
+
+  public
+  end;
+
+var
+  Form2: TForm2;
+
+implementation
+
+{$R *.dfm}
+
+procedure TForm2.FormCreate(Sender: TObject);
+begin
+  CreateBoard;
+  currentPlayer := 'w';
+  lastDoubleStepRow := -1;
+  lastDoubleStepCol := -1;
+  whiteKingMoved := False;
+  blackKingMoved := False;
+  whiteLeftRookMoved := False;
+  whiteRightRookMoved := False;
+  blackLeftRookMoved := False;
+  blackRightRookMoved := False;
+end;
+
+procedure TForm2.CreateBoard;
+const
+  FiguryBiale: array[0..7] of string = ('♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖');
+  FiguryCzarne: array[0..7] of string = ('♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜');
+var
+  i, j: Integer;
+  square: TPanel;
+  size: Integer;
+begin
+  size := 60;
+  Panel1.Left := 250;
+  Panel1.Top := 125;
+  Panel1.Width := size * 8;
+  Panel1.Height := size * 8;
+  Panel1.Caption := '';
+
+  for i := 0 to 7 do
+    for j := 0 to 7 do
+    begin
+      square := TPanel.Create(Self);
+      square.Parent := Panel1;
+      square.Width := size;
+      square.Height := size;
+      square.Left := j * size;
+      square.Top := i * size;
+      square.BevelOuter := bvNone;
+      square.Tag := i * 8 + j;
+      square.OnClick := PanelClick;
+      square.Alignment := taCenter;
+      square.Font.Size := 24;
+      square.Caption := '';
+      square.ParentBackground := False;
+
+      if (i + j) mod 2 = 0 then
+        square.Color := RGB(198,169,115)
+      else
+        square.Color := RGB(118,79,43);
+
+      if i = 0 then square.Caption := FiguryCzarne[j];
+      if i = 1 then square.Caption := '♟';
+      if i = 6 then square.Caption := '♙';
+      if i = 7 then square.Caption := FiguryBiale[j];
+
+      BoardPanels[i, j] := square;
+    end;
+end;
+
+function TForm2.CanMoveLikeRook(startRow, startCol, endRow, endCol: Integer): Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  if startRow = endRow then
+  begin
+    for i := Min(startCol, endCol) + 1 to Max(startCol, endCol) - 1 do
+      if BoardPanels[startRow, i].Caption <> '' then Exit;
+    Result := True;
+  end
+  else if startCol = endCol then
+  begin
+    for i := Min(startRow, endRow) + 1 to Max(startRow, endRow) - 1 do
+      if BoardPanels[i, startCol].Caption <> '' then Exit;
+    Result := True;
+  end;
+end;
+
+function TForm2.CanMoveLikeBishop(startRow, startCol, endRow, endCol: Integer): Boolean;
+var
+  i, rowStep, colStep: Integer;
+  r, c: Integer;
+begin
+  Result := False;
+  if Abs(startRow - endRow) <> Abs(startCol - endCol) then Exit;
+
+  rowStep := Sign(endRow - startRow);
+  colStep := Sign(endCol - startCol);
+  r := startRow + rowStep;
+  c := startCol + colStep;
+
+  while (r <> endRow) and (c <> endCol) do
+  begin
+    if BoardPanels[r, c].Caption <> '' then Exit;
+    Inc(r, rowStep);
+    Inc(c, colStep);
+  end;
+
+  Result := True;
+end;
+
+
+
+procedure TForm2.PromoButtonClick(Sender: TObject);
+var
+  btn: TButton;
+begin
+  btn := Sender as TButton;
+  promotionSelection := btn.Tag;
+  (btn.Parent as TForm).ModalResult := mrOk;
+end;
+
+function TForm2.PromotePawnDialog(player: Char): string;
+const
+  // kolejność: Hetman, Wieża, Goniec, Skoczek
+  WhitePieces: array[0..3] of string = ('♕','♖','♗','♘');
+  BlackPieces: array[0..3] of string = ('♛','♜','♝','♞');
+var
+  dlg: TForm;
+  btn: TButton;
+  i, btnWidth: Integer;
+  arr: array of string;
+begin
+  // wybierz tablicę figur
+  if player = 'w' then
+  begin
+    SetLength(arr, Length(WhitePieces));
+    for i := 0 to High(WhitePieces) do arr[i] := WhitePieces[i];
+  end
+  else
+  begin
+    SetLength(arr, Length(BlackPieces));
+    for i := 0 to High(BlackPieces) do arr[i] := BlackPieces[i];
+  end;
+
+  // utwórz dialog
+  dlg := TForm.Create(nil);
+  try
+    dlg.Caption := 'Promocja pionka';
+    dlg.BorderStyle := bsDialog;
+    dlg.Position := poScreenCenter;
+    dlg.ClientWidth := 100 * Length(arr) + 20;
+    dlg.ClientHeight := 100;
+
+    promotionSelection := 0; // domyślne: hetman
+    btnWidth := (dlg.ClientWidth - 20) div Length(arr);
+
+    for i := 0 to High(arr) do
+    begin
+      btn := TButton.Create(dlg);
+      btn.Parent := dlg;
+      btn.Caption := arr[i];
+      btn.SetBounds(10 + i * btnWidth, 10, btnWidth - 5, 40);
+      btn.Tag := i;
+      btn.OnClick := PromoButtonClick;
+    end;
+
+    if dlg.ShowModal = mrOk then
+      Result := arr[promotionSelection]
+    else
+      Result := arr[0]; // hetman jako domyślna
+  finally
+    dlg.Free;
+  end;
+end;
+
+
+
+
+
+
+
+
+
+procedure TForm2.PanelClick(Sender: TObject);
+var
+  square: TPanel;
+  row, col, i: Integer;
+  piece: string;
+  legalMoves: TList<TPoint>;
+  move: TPoint;
+
+
+
+begin
+  square := Sender as TPanel;
+  row := square.Tag div 8;
+  col := square.Tag mod 8;
+
+  if not selected then
+begin
+  piece := BoardPanels[row, col].Caption;
+
+  // Jeśli kliknięto puste pole lub figurę przeciwnika – wyjdź
+  if (piece = '') or not IsPlayersPiece(piece) then
+    Exit;
+
+  legalMoves := GenerateLegalMoves(piece, row, col);
+
+
+
+    if (legalMoves.Count = 0) then
+  begin
+    legalMoves.Free;
+    Exit;
+  end;
+
+
+
+  if legalMoves.Count > 0 then
+  begin
+    selected := True;
+    selectedRow := row;
+    selectedCol := col;
+    BoardPanels[row, col].Color := clLime;
+    for move in legalMoves do
+      BoardPanels[move.Y, move.X].Color := clYellow;
+  end;
+  legalMoves.Free;
+end
+
+
+
+
+
+
+
+  else
+
+
+  if (row = selectedRow) and (col = selectedCol) then
+begin
+  selected := False;
+  selectedRow := -1;
+  selectedCol := -1;
+  UpdateBoardColors;
+  Exit;
+end;
+
+
+
+  begin
+    piece := BoardPanels[selectedRow, selectedCol].Caption;
+
+       // White pawn
+     if piece = '♙' then
+begin
+  // ruch o 1 pole
+  if (row = selectedRow - 1) and (col = selectedCol) and (BoardPanels[row, col].Caption = '') then
+  begin
+    if not IsLegalMove(piece, selectedRow, selectedCol, row, col) then Exit;
+    if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+    if row = 0 then
+  BoardPanels[row, col].Caption := PromotePawnDialog('w')
+else
+  BoardPanels[row, col].Caption := '♙';
+    BoardPanels[selectedRow, selectedCol].Caption := '';
+    currentPlayer := 'b';
+    lastDoubleStepRow := -1; lastDoubleStepCol := -1;
+  end
+
+  // ruch o 2 pola
+  else if (selectedRow = 6) and (row = 4) and (col = selectedCol)
+       and (BoardPanels[5, col].Caption = '') and (BoardPanels[row, col].Caption = '') then
+  begin
+    if not IsLegalMove(piece, selectedRow, selectedCol, row, col) then Exit;
+    if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+    BoardPanels[row, col].Caption := '♙';
+    BoardPanels[selectedRow, selectedCol].Caption := '';
+    currentPlayer := 'b';
+    lastDoubleStepRow := selectedRow; lastDoubleStepCol := selectedCol;
+  end
+
+  // en passant
+  else if (selectedRow = 3) and (row = 2) and (Abs(col - selectedCol) = 1)
+       and (lastDoubleStepRow = 1) and (lastDoubleStepCol = col)
+       and (BoardPanels[selectedRow, col].Caption = '♟') then
+  begin
+    if not IsLegalMove(piece, selectedRow, selectedCol, row, col) then Exit;
+    if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+    if row = 0 then
+  BoardPanels[row, col].Caption := PromotePawnDialog('w')
+    else
+  BoardPanels[row, col].Caption := '♙';
+    BoardPanels[selectedRow, selectedCol].Caption := '';
+    BoardPanels[selectedRow, col].Caption := '';
+    currentPlayer := 'b';
+    lastDoubleStepRow := -1; lastDoubleStepCol := -1;
+  end
+
+  // bicie na ukos
+  else if (row = selectedRow-1) and (Abs(col-selectedCol)=1)
+    and (BoardPanels[row,col].Caption <> '')
+    and not IsPlayersPiece(BoardPanels[row,col].Caption) then
+  begin
+    if not IsLegalMove(piece, selectedRow, selectedCol, row, col) then Exit;
+    if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+    if row = 0 then
+  BoardPanels[row, col].Caption := PromotePawnDialog('w')
+    else
+  BoardPanels[row, col].Caption := '♙';
+    BoardPanels[selectedRow, selectedCol].Caption := '';
+    currentPlayer := 'b';
+    lastDoubleStepRow := -1; lastDoubleStepCol := -1;
+  end
+
+  else Exit;
+  end
+
+
+
+
+
+
+
+
+
+  else if piece = '♟' then
+begin
+  // 1 pole ruchu
+  if (row = selectedRow + 1) and (col = selectedCol) and (BoardPanels[row, col].Caption = '') then
+  begin
+     if not IsLegalMove(piece, selectedRow, selectedCol, row, col) then Exit;
+     if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+    if row = 7 then
+      BoardPanels[row, col].Caption := PromotePawnDialog('b')
+    else
+      BoardPanels[row, col].Caption := piece;
+
+    BoardPanels[selectedRow, selectedCol].Caption := '';
+    currentPlayer := 'w';
+    lastDoubleStepRow := -1;
+    lastDoubleStepCol := -1;
+  end
+
+  // 2 pola
+  else if (selectedRow = 1) and (row = 3) and (col = selectedCol)
+       and (BoardPanels[2, col].Caption = '') and (BoardPanels[row, col].Caption = '') then
+  begin
+    if not IsLegalMove(piece, selectedRow, selectedCol, row, col) then Exit;
+    if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+    BoardPanels[row, col].Caption := piece;
+    BoardPanels[selectedRow, selectedCol].Caption := '';
+    currentPlayer := 'w';
+    lastDoubleStepRow := selectedRow;
+    lastDoubleStepCol := selectedCol;
+  end
+
+  // en passant
+  else if (selectedRow = 4) and (row = 5) and (Abs(col - selectedCol) = 1)
+       and (lastDoubleStepRow = 6) and (lastDoubleStepCol = col)
+       and (BoardPanels[selectedRow, col].Caption = '♙') then
+  begin
+
+    if not IsLegalMove(piece, selectedRow, selectedCol, row, col) then Exit;
+    if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+    if row = 7 then
+      BoardPanels[row, col].Caption := PromotePawnDialog('b')
+    else
+      BoardPanels[row, col].Caption := piece;
+
+    BoardPanels[selectedRow, selectedCol].Caption := '';
+    BoardPanels[selectedRow, col].Caption := '';
+    currentPlayer := 'w';
+    lastDoubleStepRow := -1;
+    lastDoubleStepCol := -1;
+  end
+
+  // bicie na skos
+  else if (row = selectedRow + 1) and (Abs(col - selectedCol) = 1)
+       and (BoardPanels[row, col].Caption <> '')
+       and not IsPlayersPiece(BoardPanels[row, col].Caption) then
+  begin
+    if not IsLegalMove(piece, selectedRow, selectedCol, row, col) then Exit;
+    if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+
+    if row = 7 then
+      BoardPanels[row, col].Caption := PromotePawnDialog('b')
+    else
+      BoardPanels[row, col].Caption := piece;
+
+    BoardPanels[selectedRow, selectedCol].Caption := '';
+    currentPlayer := 'w';
+    lastDoubleStepRow := -1;
+    lastDoubleStepCol := -1;
+  end
+
+
+      else Exit;
+    end
+
+    // SKOCZEK
+    else if (piece = '♘') or (piece = '♞') then
+    begin
+      if (((Abs(row - selectedRow) = 2) and (Abs(col - selectedCol) = 1)) or
+          ((Abs(row - selectedRow) = 1) and (Abs(col - selectedCol) = 2))) and
+         ((BoardPanels[row, col].Caption = '') or not IsPlayersPiece(BoardPanels[row, col].Caption)) then
+      begin
+
+        if not IsLegalMove(piece, selectedRow, selectedCol, row, col) then Exit;
+        if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+        BoardPanels[row, col].Caption := piece;
+        BoardPanels[selectedRow, selectedCol].Caption := '';
+        if currentPlayer = 'w' then currentPlayer := 'b' else currentPlayer := 'w';
+        lastDoubleStepRow := -1; lastDoubleStepCol := -1;
+      end
+      else Exit;
+    end
+
+    // WIEŻA
+    else if (piece = '♖') or (piece = '♜') then
+    begin
+      if not CanMoveLikeRook(selectedRow, selectedCol, row, col) then Exit;
+      if (BoardPanels[row, col].Caption <> '') and IsPlayersPiece(BoardPanels[row, col].Caption) then Exit;
+       if not IsLegalMove(piece, selectedRow, selectedCol, row, col) then Exit;
+       if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+      BoardPanels[row, col].Caption := piece;
+      BoardPanels[selectedRow, selectedCol].Caption := '';
+      if currentPlayer = 'w' then currentPlayer := 'b' else currentPlayer := 'w';
+      lastDoubleStepRow := -1; lastDoubleStepCol := -1;
+    end
+
+    // GONIEC
+    else if (piece = '♗') or (piece = '♝') then
+    begin
+      if not CanMoveLikeBishop(selectedRow, selectedCol, row, col) then Exit;
+      if (BoardPanels[row, col].Caption <> '') and IsPlayersPiece(BoardPanels[row, col].Caption) then Exit;
+
+      if not IsLegalMove(piece, selectedRow, selectedCol, row, col) then Exit;
+      if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+
+      BoardPanels[row, col].Caption := piece;
+      BoardPanels[selectedRow, selectedCol].Caption := '';
+      if currentPlayer = 'w' then currentPlayer := 'b' else currentPlayer := 'w';
+      lastDoubleStepRow := -1; lastDoubleStepCol := -1;
+    end
+
+    // HETMAN
+    else if (piece = '♕') or (piece = '♛') then
+    begin
+      if not (CanMoveLikeRook(selectedRow, selectedCol, row, col) or
+              CanMoveLikeBishop(selectedRow, selectedCol, row, col)) then Exit;
+      if (BoardPanels[row, col].Caption <> '') and IsPlayersPiece(BoardPanels[row, col].Caption) then Exit;
+
+      if not IsLegalMove(piece, selectedRow, selectedCol, row, col) then Exit;
+      if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+
+      BoardPanels[row, col].Caption := piece;
+      BoardPanels[selectedRow, selectedCol].Caption := '';
+      if currentPlayer = 'w' then currentPlayer := 'b' else currentPlayer := 'w';
+      lastDoubleStepRow := -1; lastDoubleStepCol := -1;
+    end
+
+    // KRÓL
+
+
+
+    else if (piece = '♔') or (piece = '♚') then
+   begin
+  // Roszada - BIAŁY król
+  if (piece = '♔') and not whiteKingMoved then
+  begin
+    // Krótka
+    if (selectedRow = 7) and (selectedCol = 4) and (row = 7) and (col = 6) then
+    begin
+      if (BoardPanels[7,5].Caption = '') and (BoardPanels[7,6].Caption = '') and not whiteRightRookMoved then
+      begin
+      if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+        BoardPanels[7,4].Caption := '';
+        BoardPanels[7,6].Caption := '♔';
+        BoardPanels[7,7].Caption := '';
+        BoardPanels[7,5].Caption := '♖';
+        whiteKingMoved := True;
+        whiteRightRookMoved := True;
+        currentPlayer := 'b';
+        selected:=false;
+        selectedRow := -1;
+        selectedCol := -1;
+        UpdateBoardColors;
+
+        Exit;
+      end;
+    end;
+
+    // Długa
+    if (selectedRow = 7) and (selectedCol = 4) and (row = 7) and (col = 2) then
+    begin
+      if (BoardPanels[7,1].Caption = '') and (BoardPanels[7,2].Caption = '') and (BoardPanels[7,3].Caption = '') and not whiteLeftRookMoved then
+      begin
+      if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+        BoardPanels[7,4].Caption := '';
+        BoardPanels[7,2].Caption := '♔';
+        BoardPanels[7,0].Caption := '';
+        BoardPanels[7,3].Caption := '♖';
+        whiteKingMoved := True;
+        whiteLeftRookMoved := True;
+        currentPlayer := 'b';
+        selected:=false;
+        selectedRow := -1;
+        selectedCol := -1;
+        UpdateBoardColors;
+        Exit;
+      end;
+    end;
+  end;
+
+  // Roszada - CZARNY król
+  if (piece = '♚') and not blackKingMoved then
+  begin
+    // Krótka
+    if (selectedRow = 0) and (selectedCol = 4) and (row = 0) and (col = 6) then
+    begin
+      if (BoardPanels[0,5].Caption = '') and (BoardPanels[0,6].Caption = '') and not blackRightRookMoved then
+      begin
+      if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+        BoardPanels[0,4].Caption := '';
+        BoardPanels[0,6].Caption := '♚';
+        BoardPanels[0,7].Caption := '';
+        BoardPanels[0,5].Caption := '♜';
+        blackKingMoved := True;
+        blackRightRookMoved := True;
+        currentPlayer := 'w';
+        selected:=false;
+        selectedRow := -1;
+        selectedCol := -1;
+        UpdateBoardColors;
+        Exit;
+      end;
+    end;
+
+    // Długa
+    if (selectedRow = 0) and (selectedCol = 4) and (row = 0) and (col = 2) then
+    begin
+      if (BoardPanels[0,1].Caption = '') and (BoardPanels[0,2].Caption = '') and (BoardPanels[0,3].Caption = '') and not blackLeftRookMoved then
+      begin
+      if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+        BoardPanels[0,4].Caption := '';
+        BoardPanels[0,2].Caption := '♚';
+        BoardPanels[0,0].Caption := '';
+        BoardPanels[0,3].Caption := '♜';
+        blackKingMoved := True;
+        blackLeftRookMoved := True;
+        currentPlayer := 'w';
+        selected:=false;
+        selectedRow := -1;
+        selectedCol := -1;
+        UpdateBoardColors;
+        Exit;
+      end;
+    end;
+  end;
+
+  // Zwykły ruch króla
+  if (Abs(row - selectedRow) <= 1) and (Abs(col - selectedCol) <= 1) and
+     ((BoardPanels[row, col].Caption = '') or not IsPlayersPiece(BoardPanels[row, col].Caption)) then
+  begin
+  if not IsMoveSafe(piece, selectedRow, selectedCol, row, col) then
+begin
+  ShowMessage('Nielegalny ruch – zostawia króla w szachu!');
+  Exit;
+end;
+    BoardPanels[row, col].Caption := piece;
+    BoardPanels[selectedRow, selectedCol].Caption := '';
+    if currentPlayer = 'w' then currentPlayer := 'b' else currentPlayer := 'w';
+
+    // Oznacz, że król się ruszył
+    if piece = '♔' then whiteKingMoved := True
+    else if piece = '♚' then blackKingMoved := True;
+
+    lastDoubleStepRow := -1; lastDoubleStepCol := -1;
+  end
+  else Exit;
+  end
+
+
+
+
+
+
+
+    else
+      Exit;
+
+    selected := False;
+    UpdateBoardColors;
+  end;
+end;
+
+procedure TForm2.UpdateBoardColors;
+var
+  i, j: Integer;
+begin
+  for i := 0 to 7 do
+    for j := 0 to 7 do
+    begin
+      if (i + j) mod 2 = 0 then
+        BoardPanels[i, j].Color := RGB(198,169,115)
+      else
+        BoardPanels[i, j].Color := RGB(118,79,43);
+    end;
+end;
+
+function TForm2.IsPlayersPiece(const figura: string): Boolean;
+const
+  BialeFigury: array[0..5] of string = ('♙', '♖', '♘', '♗', '♕', '♔');
+  CzarneFigury: array[0..5] of string = ('♟', '♜', '♞', '♝', '♛', '♚');
+var
+  idx: Integer;
+begin
+  Result := False;
+  if currentPlayer = 'w' then
+  begin
+    for idx := 0 to High(BialeFigury) do
+      if figura = BialeFigury[idx] then
+        Exit(True);
+  end
+  else
+  begin
+    for idx := 0 to High(CzarneFigury) do
+      if figura = CzarneFigury[idx] then
+        Exit(True);
+  end;
+end;
+
+
+ function TForm2.PromotePawn(player: Char): string;
+var
+  choice: Char;
+begin
+  repeat
+    choice := UpCase(InputBox('Promocja pionka', 'Wybierz figurę (Q - Hetman, R - Wieża, B - Goniec, N - Skoczek):', 'Q')[1]);
+  until choice in ['Q', 'R', 'B', 'N'];
+
+  if player = 'w' then
+    case choice of
+      'Q': Result := '♕';
+      'R': Result := '♖';
+      'B': Result := '♗';
+      'N': Result := '♘';
+    end
+  else
+    case choice of
+      'Q': Result := '♛';
+      'R': Result := '♜';
+      'B': Result := '♝';
+      'N': Result := '♞';
+    end;
+end;
+
+
+
+
+
+
+
+
+
+  function TForm2.IsLegalMove(piece: string; fromRow, fromCol, toRow, toCol: Integer): Boolean;
+var
+  dx, dy: Integer;
+  target: string;
+begin
+  Result := False;
+  dx := toCol - fromCol;
+  dy := toRow - fromRow;
+  target := BoardPanels[toRow, toCol].Caption;
+
+  if not IsPlayersPiece(piece) then
+
+  Exit(False);
+
+  // Blokowanie bicia własnej figury
+  if (target <> '') and IsPlayersPiece(target) then Exit(False);
+
+
+  if (piece = '♙') and (fromRow = 3) and (toRow = 2) and
+   (Abs(toCol - fromCol) = 1) and
+   (BoardPanels[fromRow, toCol].Caption = '♟') and
+   (lastDoubleStepRow = 1) and (lastDoubleStepCol = toCol) then
+   begin
+   Exit(True);
+  end;
+
+
+  // Pion - biały
+  if piece = '♙' then
+  begin
+    if (dx = 0) and (dy = -1) and (target = '') then Exit(True); // ruch 1 pole
+    if (dx = 0) and (dy = -2) and (fromRow = 6) and (BoardPanels[fromRow - 1, fromCol].Caption = '') and (target = '') then Exit(True); // ruch 2 pola
+    if (Abs(dx) = 1) and (dy = -1) and (target <> '') and not IsPlayersPiece(target) then Exit(True); // bicie
+  end;
+
+
+
+  // Pion - czarny
+
+
+
+
+   if (piece = '♟') and (fromRow = 4) and (toRow = 5) and
+   (Abs(toCol - fromCol) = 1) and
+   (BoardPanels[fromRow, toCol].Caption = '♙') and
+   (lastDoubleStepRow = 6) and (lastDoubleStepCol = toCol) then
+   begin
+   Exit(True);
+   end
+
+  else if piece = '♟' then
+  begin
+    if (dx = 0) and (dy = 1) and (target = '') then Exit(True);
+    if (dx = 0) and (dy = 2) and (fromRow = 1) and (BoardPanels[fromRow + 1, fromCol].Caption = '') and (target = '') then Exit(True);
+    if (Abs(dx) = 1) and (dy = 1) and (target <> '') and not IsPlayersPiece(target) then Exit(True);
+  end
+
+
+
+
+  // Skoczek
+  else if (piece = '♘') or (piece = '♞') then
+  begin
+    if (((Abs(dy) = 2) and (Abs(dx) = 1)) or ((Abs(dy) = 1) and (Abs(dx) = 2))) then Exit(True);
+  end
+
+  // Goniec
+  else if (piece = '♗') or (piece = '♝') then
+  begin
+    if CanMoveLikeBishop(fromRow, fromCol, toRow, toCol) then Exit(True);
+  end
+
+  // Wieża
+  else if (piece = '♖') or (piece = '♜') then
+  begin
+    if CanMoveLikeRook(fromRow, fromCol, toRow, toCol) then Exit(True);
+  end
+
+  // Hetman
+  else if (piece = '♕') or (piece = '♛') then
+  begin
+    if CanMoveLikeRook(fromRow, fromCol, toRow, toCol) or CanMoveLikeBishop(fromRow, fromCol, toRow, toCol) then Exit(True);
+  end
+
+  // Król (nie sprawdza szacha!)
+  else if (piece = '♔') or (piece = '♚') then
+  begin
+    if (Abs(dx) <= 1) and (Abs(dy) <= 1) then Exit(True);
+  end;
+
+  Result := False;
+end;
+
+
+
+function Tform2.GenerateLegalMoves(piece: string; row, col: Integer): TList<TPoint>;
+var
+  r, c: Integer;
+  move: TPoint;
+  moves: TList<TPoint>;
+begin
+  moves := TList<TPoint>.Create;
+  for r := 0 to 7 do
+    for c := 0 to 7 do
+    begin
+      if IsLegalMove(piece, row, col, r, c) then
+      begin
+        move := Point(c, r); // Point(x, y)
+        moves.Add(move);
+      end;
+    end;
+  Result := moves;
+end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function TForm2.FindKing(player: Char): TPoint;
+var
+  r, c: Integer;
+  kingSymbol: string;
+begin
+  Result := Point(-1, -1);
+  if player = 'w' then
+    kingSymbol := '♔'
+  else
+    kingSymbol := '♚';
+
+  for r := 0 to 7 do
+    for c := 0 to 7 do
+      if BoardPanels[r, c].Caption = kingSymbol then
+      begin
+        Result := Point(c, r);
+        Exit;
+      end;
+end;
+
+function TForm2.IsEnemyPiece(figura: string; player: Char): Boolean;
+const
+  BialeFigury: array[0..5] of string = ('♙', '♖', '♘', '♗', '♕', '♔');
+  CzarneFigury: array[0..5] of string = ('♟', '♜', '♞', '♝', '♛', '♚');
+var
+  idx: Integer;
+begin
+  Result := False;
+  if player = 'w' then
+  begin
+    for idx := 0 to High(CzarneFigury) do
+      if figura = CzarneFigury[idx] then
+        Exit(True);
+  end
+  else
+  begin
+    for idx := 0 to High(BialeFigury) do
+      if figura = BialeFigury[idx] then
+        Exit(True);
+  end;
+end;
+
+function TForm2.IsKingInCheck(player: Char): Boolean;
+var
+  row, col: Integer;
+  kingPiece: string;
+  r, c: Integer;
+  piece: string;
+  moves: TList<TPoint>;
+  move: TPoint;
+begin
+  Result := False;
+
+  // Znajdź króla gracza
+  if player = 'w' then
+    kingPiece := '♔'
+  else
+    kingPiece := '♚';
+
+  for row := 0 to 7 do
+    for col := 0 to 7 do
+      if BoardPanels[row, col].Caption = kingPiece then
+      begin
+        r := row;
+        c := col;
+        Break;
+      end;
+
+  // Przejrzyj wszystkie figury przeciwnika
+  for row := 0 to 7 do
+    for col := 0 to 7 do
+    begin
+      piece := BoardPanels[row, col].Caption;
+      if (piece <> '') and (IsPlayersPiece(piece) <> (player = 'w')) then
+      begin
+        moves := GenerateLegalMoves(piece, row, col);
+        for move in moves do
+        begin
+          if (move.Y = r) and (move.X = c) then
+          begin
+            moves.Free;
+            Exit(True); // Król jest atakowany
+          end;
+        end;
+        moves.Free;
+      end;
+    end;
+end;
+
+
+
+
+
+
+
+
+function TForm2.IsWhitePiece(piece: string): Boolean;
+
+
+begin
+
+Result := (piece = '♙') or (piece = '♘') or (piece = '♗') or
+          (piece = '♖') or (piece = '♕') or (piece = '♔');
+
+end;
+
+
+
+
+
+
+
+
+
+
+function TForm2.IsMoveSafe(piece: string; fromRow, fromCol, toRow, toCol: Integer): Boolean;
+var
+  originalFrom, originalTo: string;
+  player: Char;
+begin
+  originalFrom := BoardPanels[fromRow, fromCol].Caption;
+  originalTo := BoardPanels[toRow, toCol].Caption;
+
+  // Tymczasowy ruch
+  BoardPanels[toRow, toCol].Caption := piece;
+  BoardPanels[fromRow, fromCol].Caption := '';
+
+  // Sprawdzenie gracza
+  if IsWhitePiece(piece) then
+    player := 'w'
+  else
+    player := 'b';
+
+  // Sprawdź czy król jest w szachu
+  Result := not IsKingInCheck(player);
+
+  // Cofnij ruch
+  BoardPanels[fromRow, fromCol].Caption := originalFrom;
+  BoardPanels[toRow, toCol].Caption := originalTo;
+end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+end.
