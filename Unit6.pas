@@ -11,7 +11,8 @@ uses
   FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf, FireDAC.DApt.Intf,
   FireDAC.Stan.Async, FireDAC.DApt, Data.DB, FireDAC.Comp.DataSet,
   FireDAC.Comp.Client, FireDAC.UI.Intf, FireDAC.Stan.Def, FireDAC.Stan.Pool,
-  FireDAC.Phys, FireDAC.Phys.MySQL, FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait, System.Hash, UserSession, Unit4;
+  FireDAC.Phys, FireDAC.Phys.MySQL, FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait, System.Hash, UserSession, Unit4,
+  IdBaseComponent, IdComponent, IdTCPConnection, IdTCPClient;
 
 
 
@@ -28,6 +29,7 @@ type
     FDQuery1: TFDQuery;
     FDConnection1: TFDConnection;
     FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink;
+    IdTCPClient1: TIdTCPClient;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormCreate(Sender: TObject);
     procedure FormResize(Sender: TObject);
@@ -40,6 +42,8 @@ type
 
   private
     function HashPassword(const Password: string): string;
+    function IsLogged(const User: string): boolean;
+    function EnsureConnected: Boolean;
   public
     { Public declarations }
   end;
@@ -79,6 +83,7 @@ end;
 
 procedure TLogin.FormCreate(Sender: TObject);
 begin
+Application.Title:='Log in';
 Image1.SendToBack;
 FormResize(self);
 end;
@@ -130,6 +135,37 @@ begin
   BackButton.SetBounds(centerX + 10, LoginButton.Top, 140, fieldHeight);
 
 end;
+
+
+
+function TLogin.IsLogged(const User: string): boolean;
+begin
+
+
+
+
+
+end;
+
+
+
+function TLogin.EnsureConnected: Boolean;
+begin
+  Result := True;
+  if not IdTCPClient1.Connected then
+    try
+      IdTCPClient1.Host := '127.0.0.1';
+      IdTCPClient1.Port := 5000;
+      IdTCPClient1.Connect;
+    except
+      on E: Exception do
+      begin
+        ShowMessage('Nie uda³o siê po³¹czyæ z serwerem: ' + E.Message);
+        Result := False;
+      end;
+    end;
+end;
+
 
 
 procedure TLogin.LoginButtonClick(Sender: TObject);
