@@ -46,6 +46,7 @@ type
     WaitingRapid, WaitingBlitz, WaitingBullet: TList<TPlayerInfo>;
     ActivePairs: TList<TPlayerPair>;
     ListLock: TCriticalSection;
+    ActivePlayers: TDictionary<string, boolean>;
 
     procedure TryPairRapid;
     procedure TryPairBlitz;
@@ -96,12 +97,14 @@ end;
 procedure TForm10.FormCreate(Sender: TObject);
 begin
   Randomize;
+
   // Tworzymy listy i sekcję krytyczną
   WaitingRapid  := TList<TPlayerInfo>.Create;
   WaitingBlitz  := TList<TPlayerInfo>.Create;
   WaitingBullet := TList<TPlayerInfo>.Create;
   ActivePairs    := TList<TPlayerPair>.Create;
   ListLock       := TCriticalSection.Create;
+  ActivePlayerS:= TDictionary<string, boolean>.Create();
 
   // Ustawienia MemoLog
   MemoLog.Clear;
@@ -125,6 +128,7 @@ begin
   WaitingBlitz.Free;
   WaitingBullet.Free;
   ActivePairs.Free;
+  ActivePlayers.Free;
   Log('Serwer zatrzymany');
 end;
 
