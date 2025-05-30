@@ -42,8 +42,11 @@ type
 
   private
     function HashPassword(const Password: string): string;
-    function IsLogged(const User: string): boolean;
+    function ServerIsLogged(const Username: string): Boolean;
     function EnsureConnected: Boolean;
+    function SendServerCommand(const Cmd: string): string;
+    procedure ServerAddPlayer(const Username: string);
+    procedure ServerRemovePlayer(const Username: string);
   public
     { Public declarations }
   end;
@@ -136,15 +139,37 @@ begin
 
 end;
 
-
-
-function TLogin.IsLogged(const User: string): boolean;
+function TLogin.SendServerCommand(const Cmd: string): string;
 begin
+  if not EnsureConnected then
+    Exit('');
+  // bez kodowania
+  IdTCPClient1.IOHandler.WriteLn(Cmd);
+    Result := IdTCPClient1.IOHandler.ReadLn('', 1500);
+end;
+
+
+
+procedure TLogin.ServerRemovePlayer(const Username: string);
+begin
+  if IdTCPClient1.Connected then
+    SendServerCommand('REMOVEPLAYER:' + Username);
+end;
 
 
 
 
 
+procedure TLogin.ServerAddPlayer(const Username: string);
+begin
+  SendServerCommand('ADDPLAYER:' + Username);
+end;
+
+
+
+function TLogin.ServerIsLogged(const Username: string): Boolean;
+begin
+  Result := SameText(SendServerCommand('ISLOGGED:' + Username), 'YES');
 end;
 
 
@@ -157,6 +182,7 @@ begin
       IdTCPClient1.Host := '127.0.0.1';
       IdTCPClient1.Port := 5000;
       IdTCPClient1.Connect;
+      UserSession.IdTCPClient1:= Self.IdTCPClient1;
     except
       on E: Exception do
       begin
@@ -195,6 +221,17 @@ begin
 
     if not query.IsEmpty then
     begin
+        if not EnsureConnected then Exit;
+        if ServerIsLogged(enteredLogin) then
+        begin
+        ShowMessage('Ten u¿ytkownik jest ju¿ zalogowany na serwerze.');
+        Exit;
+        end;
+
+  // 3) dodaj na serwerze
+       ServerAddPlayer(enteredLogin);
+
+
       UserSession.LoggedUserLogin:= enteredLogin;
       UserSession.Logged:= true;
       UserSession.LoggedUserID:= query.FieldByName('userid').AsInteger;

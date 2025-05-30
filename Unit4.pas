@@ -5,7 +5,8 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Unit3, System.ImageList,
-  Vcl.ImgList, Vcl.ExtCtrls, Vcl.Imaging.jpeg, Unit5, UserSession;
+  Vcl.ImgList, Vcl.ExtCtrls, Vcl.Imaging.jpeg, Unit5, UserSession,
+  IdBaseComponent, IdComponent, IdTCPConnection, IdTCPClient;
 
 
 type
@@ -103,6 +104,7 @@ end;
 
 procedure TMainMenu.ButtonExit5Click(Sender: TObject);
 begin
+UserSession.Logout;
 Application.Terminate;
 end;
 
@@ -128,6 +130,7 @@ end;
 
 procedure TMainMenu.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+UserSession.Logout;
 Application.terminate;
 end;
 
