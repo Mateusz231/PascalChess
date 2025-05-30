@@ -11,7 +11,7 @@ uses
   FireDAC.DApt.Intf, FireDAC.Stan.Async, FireDAC.DApt, FireDAC.UI.Intf,
   FireDAC.Stan.Def, FireDAC.Stan.Pool, FireDAC.Phys, FireDAC.Phys.MySQL,
   FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait, Data.DB, FireDAC.Comp.Client,
-  FireDAC.Comp.DataSet;
+  FireDAC.Comp.DataSet, Vcl.Grids;
 
 type
   /// Informacje o graczu oczekującym na parę
@@ -37,6 +37,7 @@ type
     FDQuery1: TFDQuery;
     FDConnection1: TFDConnection;
     FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink;
+    sgPlayers: TStringGrid;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure IdTCPServer1Execute(AContext: TIdContext);
@@ -59,6 +60,7 @@ type
     procedure BroadcastEndgame(SenderClient: TIdContext; const Msg: string);
     procedure BroadcastChat(SenderClient: TIdContext; const Text: string);
     procedure BroadcastSan(SenderClient: TIdContext; const Msg: string);
+    procedure RefreshPlayerGrid;
 
 
 
@@ -97,6 +99,20 @@ end;
 procedure TForm10.FormCreate(Sender: TObject);
 begin
   Randomize;
+
+  Application.title:='Server';
+
+  sgPlayers.ColCount   := 2;
+  sgPlayers.RowCount   := 2;     // tylko nagłówek
+  sgPlayers.FixedCols  := 0;
+  sgPlayers.FixedRows  := 1;
+  sgPlayers.Options    := sgPlayers.Options + [goRowSelect, goColSizing];
+  sgPlayers.Cells[0,0] := 'Login';
+  sgPlayers.Cells[1,0] := 'InGame';
+  sgPlayers.ColWidths[0] := 150;
+  sgPlayers.ColWidths[1] := 60;
+
+
 
   // Tworzymy listy i sekcję krytyczną
   WaitingRapid  := TList<TPlayerInfo>.Create;
@@ -144,9 +160,10 @@ var
   i: Integer;
 begin
   Log('Rozłączono ' + AContext.Binding.PeerIP + ':' + AContext.Binding.PeerPort.ToString);
-
   ListLock.Acquire;
+
   try
+  ActivePlayers.Remove();
     // Szukamy pary zawierającej tego gracza
     for i := ActivePairs.Count - 1 downto 0 do
     begin
@@ -234,10 +251,14 @@ begin
     begin
       Pair.WhitePlayer := P1.Context; Pair.WhiteLogin := P1.Login; Pair.WhiteID := P1.ID;
       Pair.BlackPlayer := P2.Context; Pair.BlackLogin := P2.Login; Pair.BlackID := P2.ID;
+      ActivePlayers[P1.Login] := True;
+      ActivePlayers[P2.Login] := True;
     end else
     begin
       Pair.WhitePlayer := P2.Context; Pair.WhiteLogin := P2.Login; Pair.WhiteID := P2.ID;
       Pair.BlackPlayer := P1.Context; Pair.BlackLogin := P1.Login; Pair.BlackID := P1.ID;
+      ActivePlayers[P1.Login] := True;
+      ActivePlayers[P2.Login] := True;
     end;
      // **Ustawiamy czasy PRZED** dodaniem do listy
     Pair.WhiteSeconds     := RapidTime;
@@ -295,10 +316,14 @@ begin
     begin
       Pair.WhitePlayer := P1.Context; Pair.WhiteLogin := P1.Login; Pair.WhiteID := P1.ID;
       Pair.BlackPlayer := P2.Context; Pair.BlackLogin := P2.Login; Pair.BlackID := P2.ID;
+      ActivePlayers[P1.Login] := True;
+      ActivePlayers[P2.Login] := True;
     end else
     begin
       Pair.WhitePlayer := P2.Context; Pair.WhiteLogin := P2.Login; Pair.WhiteID := P2.ID;
       Pair.BlackPlayer := P1.Context; Pair.BlackLogin := P1.Login; Pair.BlackID := P1.ID;
+      ActivePlayers[P1.Login] := True;
+      ActivePlayers[P2.Login] := True;
     end;
 
      // **Ustawiamy czasy PRZED** dodaniem do listy
@@ -352,10 +377,14 @@ begin
     begin
       Pair.WhitePlayer := P1.Context; Pair.WhiteLogin := P1.Login; Pair.WhiteID := P1.ID;
       Pair.BlackPlayer := P2.Context; Pair.BlackLogin := P2.Login; Pair.BlackID := P2.ID;
+      ActivePlayers[P1.Login] := True;
+      ActivePlayers[P2.Login] := True;
     end else
     begin
       Pair.WhitePlayer := P2.Context; Pair.WhiteLogin := P2.Login; Pair.WhiteID := P2.ID;
       Pair.BlackPlayer := P1.Context; Pair.BlackLogin := P1.Login; Pair.BlackID := P1.ID;
+      ActivePlayers[P1.Login] := True;
+      ActivePlayers[P2.Login] := True;
     end;
 
 
@@ -529,6 +558,7 @@ begin
    Pair.BlackPlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
   // IdTCPServer1Disconnect(Pair.WhitePlayer);
    //IdTCPServer1Disconnect(Pair.BlackPlayer)
+
   end
 
 
@@ -613,6 +643,45 @@ begin
     BroadcastChat(AContext, Msg.Substring(5).Trim);
     Exit;
   end;
+
+
+  // Dodaj gracza do słownika (jeszcze nie w grze)
+  if Msg.StartsWith('ADDPLAYER:') then
+  begin
+  var user := Msg.Substring(10);
+  if not ActivePlayers.ContainsKey(user) then
+  ActivePlayers.Add(user, False);
+  //AContext.Connection.IOHandler.WriteLn('OK');
+    RefreshPlayerGrid;
+  Exit;
+
+  end;
+
+// Usuń gracza (logout/rozłączenie)
+  if Msg.StartsWith('REMOVEPLAYER:') then
+  begin
+  ActivePlayers.Remove(Msg.Substring(13));
+
+  RefreshPlayerGrid;
+
+  Exit;
+  end;
+
+// Sprawdź, czy zalogowany
+  if Msg.StartsWith('ISLOGGED:') then
+  begin
+  if ActivePlayers.ContainsKey(Msg.Substring(9)) then
+    AContext.Connection.IOHandler.WriteLn('YES')
+  else
+    AContext.Connection.IOHandler.WriteLn('NO');
+
+
+
+  Exit;
+   end;
+
+
+
 
 
 
@@ -771,6 +840,48 @@ end;
 
 
 
+
+procedure TForm10.RefreshPlayerGrid;
+var
+  row: Integer;
+  keys: TArray<string>;
+begin
+  // Wywołaj zawsze w głównym wątku
+  if not TThread.CheckTerminated then
+    TThread.Queue(nil,
+      procedure
+      begin
+        ListLock.Acquire;
+        try
+          ShowMessage('RefreshPlayerGrid: ActivePlayers.Count=' +
+      ActivePlayers.Count.ToString);
+          // Zbierz wszystkie loginy
+          keys := ActivePlayers.Keys.ToArray;
+          // Ustaw liczbę wierszy (nagłówek + rekordy)
+          sgPlayers.RowCount := Length(keys) + 1;
+          // Wypełnij wiersze
+          for var i := 0 to High(keys) do
+          begin
+            row := i + 1;
+            sgPlayers.Cells[0, row] := keys[i];
+
+            if ActivePlayers[keys[i]] then
+            begin
+            sgPlayers.Cells[1,row]:='YES';
+            end
+            else
+            begin
+            sgPlayers.Cells[1,row]:='NO';
+            end;
+
+            //sgPlayers.Cells[1, row] := IfThen(ActivePlayers[keys[i]], 'YES', 'NO');
+          end;
+        finally
+          ListLock.Release;
+        end;
+      end
+    );
+end;
 
 
 
