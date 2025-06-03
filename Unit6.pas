@@ -145,7 +145,7 @@ begin
     Exit('');
   // bez kodowania
   IdTCPClient1.IOHandler.WriteLn(Cmd);
-    Result := IdTCPClient1.IOHandler.ReadLn('', 1500);
+    Result := IdTCPClient1.IOHandler.ReadLn('', 500);
 end;
 
 

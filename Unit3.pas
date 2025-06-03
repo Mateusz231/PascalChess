@@ -37,12 +37,12 @@ type
     lblBlackTime: TLabel;
 
     procedure FormShow(Sender: TObject);
-    procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure Timer1Timer(Sender: TObject);
     procedure tmrWhiteTimer(Sender: TObject);
     procedure tmrBlackTimer(Sender: TObject);
     procedure PanelClick(Sender: TObject);
     procedure FormResize(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
 
 
 
@@ -77,6 +77,7 @@ type
     GameType: Integer;
     lstMoves: TListBox;
     MovesList: TStringList;
+    InGame: Boolean;
 
 
 
@@ -101,10 +102,8 @@ type
     procedure PromoButtonClick(Sender: TObject);
     procedure CheckEndGame;
     procedure UpdateClockLabels;
-    procedure SyncTime;
     procedure UpdateTimers;
     procedure DisableBoard;
-    procedure AddIncrementFor(const Color: string);
     procedure UpdateOpponentLabelsPosition;
     procedure UpdateYourLabelsPosition;
     procedure SetupCoordinatesLeftAndBottom;
@@ -115,6 +114,7 @@ type
     procedure FreeMemory;
     procedure CreateMovesList;
     procedure AddMoveToList(const Move: string);
+
 
 
   /////
@@ -193,11 +193,19 @@ end;
 procedure TChess.FormShow(Sender: TObject);
 begin
   LoginName := UserSession.LoggedUserLogin;
-  IdTCPClient1.Host := '127.0.0.1';
-  IdTCPClient1.Port := 5000;
+
   Application.Title:='Chess';
-  try
-    IdTCPClient1.Connect;
+
+    IdTCPClient1:= UserSession.IdTCPClient1;
+
+     if not IdTCPClient1.Connected then
+    begin
+    ShowMessage('Błąd połączenia z serwerem.');
+    FreeMemory;
+    Self.Close;
+    Exit;
+    end;
+
     IdTCPClient1.IOHandler.WriteLn('LOGIN:' + LoginName);
     IdTCPClient1.IOHandler.WriteLn('ID:' + IntToStr(UserSession.LoggedUserID));
     IdTCPClient1.IOHandler.WriteLn('MODE:'+IntToStr(GameType));
@@ -209,18 +217,9 @@ begin
       ShowMessage('Odpowiedź od serwera: ' + msg);
     end;
 
-  except
-    ShowMessage('Błąd połączenia z serwerem.');
-    FreeMemory;
-    Self.Close;
-    //Application.MainForm.Show;
-    Exit;
-  end;
 
-
-
-  CreateBoard;
-  UpdateClockLabelsPosition;
+     CreateBoard;
+     UpdateClockLabelsPosition;
 
  tmrWhite.Interval := 1000;
  tmrWhite.Enabled  := False;
@@ -236,13 +235,27 @@ begin
 end;
 
 
-procedure TChess.FormClose(Sender: TObject; var Action: TCloseAction);
+procedure TChess.FormDestroy(Sender: TObject);
 begin
-  if IdTCPClient1.Connected then IdTCPClient1.Disconnect;
-  FreeMemory;
-  Action := caHide; // usuń ten formularz
-end;
+//  if IdTCPClient1.Connected then IdTCPClient1.Disconnect;
+  if InGame and not Win then
+  begin
 
+  SendMove('LEFT');
+
+ // IdTCPClient1.IOHandler.WriteLn('LEFT');
+  SendMove('ENDGAME:LOSE');
+  FreeMemory;
+  end
+
+  else
+  begin
+  SendMove('QUEUELEFT');
+  FreeMemory;
+  end;
+
+
+end;
 
 procedure TChess.FormResize(Sender: TObject);
 const
@@ -421,28 +434,6 @@ end;
 
 
 
-procedure TChess.SyncTime;
-
-var
-  Elapsed: Integer;
-  TimedMsg: string;
-  MoveStr: string;
-begin
-  // 1. policz upływ od początku tury
-  Elapsed := SecondsBetween(Now, TurnStartTime);
-  // 2. złóż pełny komunikat
-  TimedMsg := Format('%s|TIME:%d', [MoveStr, Elapsed]);
-  // 3. wyślij go „ręcznie”, omijając SendMove
-  if IdTCPClient1.Connected then
-    IdTCPClient1.IOHandler.WriteLn(TimedMsg);
-
-  // 4. wyłącz lokalne timery
-  IsMyTurn := False;
-  tmrWhite.Enabled := False;
-  tmrBlack.Enabled := False;
-end;
-
-
 
 
 
@@ -470,6 +461,7 @@ begin
     else
     begin
     ShowMessage('White lost on time, you win!');
+    Win:=true;
     DisableBoard;
     end;
 
@@ -495,6 +487,7 @@ begin
     else
     begin
     ShowMessage('Black lost on time, you win!');
+    Win:=true;
     DisableBoard;
     end;
 
@@ -713,16 +706,13 @@ begin
 end;
 
 
-
+   //
 procedure TChess.ReceiveMessages;
 var
   Msg, FollowUp, payload: string;
   parts: TArray<string>;
   wPart, bPart: string;
   sr, sc, tr, tc: Integer;
-  moveNotation: string;
-  san: string;
-  promo: TPiece;
 begin
   if not IdTCPClient1.Connected then Exit;
 
@@ -774,10 +764,11 @@ begin
               LastDst := Point(tc, tr);
               if Lost then
               begin
-              ShowMessage('You lost!');
+              ShowMessage('You lost by checkmate!');
               DisableBoard;
               tmrWhite.Enabled := False;
               tmrBlack.Enabled := False;
+              InGame:= False;
               end;
 
               IsMyTurn := True;
@@ -854,10 +845,11 @@ begin
         LastDst := Point(tc, tr);
         if Lost then
         begin
-         ShowMessage('You lost!');
+         ShowMessage('You lost by checkmate!');
          DisableBoard;
          tmrWhite.Enabled := False;
          tmrBlack.Enabled := False;
+         InGame:= false;
         end;
         IsMyTurn := True;
         TurnStartTime := Now;
@@ -877,7 +869,11 @@ begin
 
   // 6) Pozostałe komunikaty
   if Msg = 'START' then
-    ShowMessage('Gra rozpoczęta!')
+  begin
+   ShowMessage('Gra rozpoczęta!');
+   InGame:= True;
+  end
+
   else if Msg.StartsWith('COLOR:') then
   begin
     MyColor := Msg.Substring(6);
@@ -899,11 +895,12 @@ begin
 
   else if Msg.StartsWith('OPPONENT_LEFT') then
   begin
-
-
-   // FreeMemory;
-   // Self.Close;
-    //Application.MainForm.Show;
+  ShowMessage('Your opponent left, you win!');
+  SendMove('ENDGAME:WIN');
+  DisableBoard;
+  tmrWhite.Enabled := False;
+  tmrBlack.Enabled := False;
+  InGame:= false;
   end
   else if Msg.StartsWith('OPPONENT_PROMO:') then
 
@@ -1695,7 +1692,9 @@ begin
   begin
     SendMove('ENDGAME:WIN');
     ShowMessage('Mat! przeciwnik nie ma ruchu.');
-    Timer1.Enabled := False;
+    tmrWhite.Enabled := False;
+    tmrBlack.Enabled := False;
+    Win:=true;
     Exit;
   end;
 
@@ -1703,7 +1702,9 @@ begin
   begin
     SendMove('ENDGAME:DRAW');
     ShowMessage('Pat!');
-    Timer1.Enabled := False;
+    tmrWhite.Enabled := False;
+    tmrBlack.Enabled := False;
+    Draw:=true;
     Exit;
   end;
 end;
@@ -1746,19 +1747,6 @@ begin
     for c := 0 to 7 do
       BoardPanels[r, c].Enabled := False;
 end;
-
-
-
-
-
-procedure TChess.AddIncrementFor(const Color: string);
-begin
-  if Color = 'WHITE' then
-    WhiteSeconds := WhiteSeconds + IncrementSeconds
-  else
-    BlackSeconds := BlackSeconds + IncrementSeconds;
-end;
-
 
 
 procedure TChess.SetupCoordinatesLeftAndBottom;
@@ -2177,12 +2165,9 @@ function TChess.MoveToSAN(
   Promotion: TPiece
 ): string;
 var
-  prefix, action, dest, promoPart, disambig: string;
+  prefix, action, dest, disambig: string;
   isPawn: Boolean;
-  isCheck, isMate: Boolean;
-  origDst, origSrc: TPiece;
   r, c: Integer;
-  reachCount: Integer;
   needFile: Boolean;
   candidates: TList<TPoint>;
 begin

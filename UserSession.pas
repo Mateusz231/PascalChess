@@ -21,6 +21,7 @@ begin
   If IdTCPClient1.Connected then
   begin
   IdTCPClient1.IOHandler.WriteLn('REMOVEPLAYER:'+ LoggedUserLogin);
+  IdTCPClient1.Disconnect;
   end;
 
 

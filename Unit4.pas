@@ -104,8 +104,20 @@ end;
 
 procedure TMainMenu.ButtonExit5Click(Sender: TObject);
 begin
+if UserSession.Logged then
+begin
 UserSession.Logout;
 Application.Terminate;
+end
+
+else
+begin
+Application.Terminate;
+end;
+
+
+
+
 end;
 
 procedure TMainMenu.ButtonLogin6Click(Sender: TObject);
@@ -130,8 +142,19 @@ end;
 
 procedure TMainMenu.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+if UserSession.Logged then
+begin
 UserSession.Logout;
 Application.terminate;
+end
+
+else
+begin
+Application.terminate;
+end;
+
+
+
 end;
 
 procedure TMainMenu.FormCreate(Sender: TObject);
@@ -177,10 +200,15 @@ end;
 
 procedure TMainMenu.LogoutButtonClick(Sender: TObject);
 begin
+
+
 UserSession.Logout;
 ShowMessage('Wylogowano');
 LogoutButton.Visible:= false;
 Button6.Visible:= true;
+
+
+
 end;
 
 end.

@@ -10,7 +10,7 @@ object Chess: TChess
   Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
-  OnClose = FormClose
+  OnDestroy = FormDestroy
   OnResize = FormResize
   OnShow = FormShow
   TextHeight = 15
