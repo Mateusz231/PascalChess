@@ -42,7 +42,6 @@ type
     procedure FormDestroy(Sender: TObject);
     procedure IdTCPServer1Execute(AContext: TIdContext);
     procedure IdTCPServer1Connect(AContext: TIdContext);
-    procedure IdTCPServer1Disconnect(AContext: TIdContext);
   private
     WaitingRapid, WaitingBlitz, WaitingBullet: TList<TPlayerInfo>;
     ActivePairs: TList<TPlayerPair>;
@@ -61,6 +60,9 @@ type
     procedure BroadcastChat(SenderClient: TIdContext; const Text: string);
     procedure BroadcastSan(SenderClient: TIdContext; const Msg: string);
     procedure RefreshPlayerGrid;
+    procedure OnPlayerLeft(AContext: TidContext);
+    procedure IdTCPServer1Disconnect(AContexT: TIdContext);
+    procedure QueueLeft(AContext: TIdContext);
 
 
 
@@ -153,17 +155,25 @@ begin
   Log('Nowe połączenie z ' + AContext.Binding.PeerIP + ':' + AContext.Binding.PeerPort.ToString);
 end;
 
+
+
 procedure TForm10.IdTCPServer1Disconnect(AContext: TIdContext);
-var
+begin
+  Log('Rozłączono ' + AContext.Binding.PeerIP + ':' + AContext.Binding.PeerPort.ToString);
+end;
+
+
+
+procedure TForm10.OnPlayerLeft(AContext: TIdContext);
+ var
   Pair: TPlayerPair;
   Opponent: TIdContext;
   i: Integer;
 begin
-  Log('Rozłączono ' + AContext.Binding.PeerIP + ':' + AContext.Binding.PeerPort.ToString);
   ListLock.Acquire;
 
   try
-  ActivePlayers.Remove();
+ //  ActivePlayers.Remove();
     // Szukamy pary zawierającej tego gracza
     for i := ActivePairs.Count - 1 downto 0 do
     begin
@@ -172,9 +182,27 @@ begin
       if (Pair.WhitePlayer = AContext) or (Pair.BlackPlayer = AContext) then
       begin
         if Pair.WhitePlayer = AContext then
-          Opponent := Pair.BlackPlayer
+        begin
+        Opponent := Pair.BlackPlayer;
+        if ActivePlayers.ContainsKey(Pair.WhiteLogin) then
+        begin
+          ActivePlayers[Pair.WhiteLogin]:=false;
+        end;
+
+        end
+
         else
-          Opponent := Pair.WhitePlayer;
+        begin
+        Opponent := Pair.WhitePlayer;
+
+          if ActivePlayers.ContainsKey(Pair.BlackLogin) then
+        begin
+          ActivePlayers[Pair.BlackLogin]:=false;
+        end;
+
+
+        end;
+
 
         // Usuwamy parę z listy
         ActivePairs.Delete(i);
@@ -197,9 +225,19 @@ begin
     ListLock.Release;
   end;
 
+  RefreshPlayerGrid;
 
 
-  ListLock.Acquire;
+end;
+
+
+
+procedure TForm10.QueueLeft(AContext: TIdContext);
+  var
+  i: Integer;
+
+begin
+   ListLock.Acquire;
   try
     for i := WaitingRapid.Count-1 downto 0 do
       if WaitingRapid[i].Context = AContext then
@@ -214,13 +252,9 @@ begin
     ListLock.Release;
   end;
 
-
-
-
-
-
-
 end;
+
+
 
 
 
@@ -268,7 +302,7 @@ begin
 
     ActivePairs.Add(Pair);
 
-
+    RefreshPlayerGrid;
 
 
 
@@ -331,7 +365,7 @@ begin
     Pair.BlackSeconds     := BlitzTime;
     Pair.IncrementSeconds := BlitzIncrement;
 
-
+    RefreshPlayerGrid;
 
 
     ActivePairs.Add(Pair);
@@ -387,6 +421,7 @@ begin
       ActivePlayers[P2.Login] := True;
     end;
 
+    RefreshPlayerGrid;
 
      // **Ustawiamy czasy PRZED** dodaniem do listy
     Pair.WhiteSeconds     := BulletTime;
@@ -503,7 +538,7 @@ begin
   else
     Pair.WhitePlayer.Connection.IOHandler.WriteLn('SAN:' + Msg);
 
-  Log('Forwarduję promocję: ' + Msg);
+  Log('Forwarduję SAN: ' + Msg);
 
 end;
 
@@ -539,15 +574,12 @@ end;
 
 
 procedure TForm10.BroadcastEndgame(SenderClient: TIdContext; const Msg: string);
-begin
 
 var
   Pair: TPlayerPair;
 begin
   Pair := FindPairWithPlayer(SenderClient);
   if Pair.WhitePlayer = nil then Exit;
-
-  // Jeśli to biały wysłał PROMO ➜ do czarnego i odwrotnie
 
   if Msg='LOSE' then
 
@@ -556,8 +588,8 @@ begin
   if SenderClient = Pair.WhitePlayer then
   begin
    Pair.BlackPlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
-  // IdTCPServer1Disconnect(Pair.WhitePlayer);
-   //IdTCPServer1Disconnect(Pair.BlackPlayer)
+   ActivePlayers[Pair.BlackLogin]:=false;
+   ActivePlayers[Pair.WhiteLogin]:=false;
 
   end
 
@@ -565,8 +597,8 @@ begin
   else
   begin
    Pair.WhitePlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
-  // IdTCPServer1Disconnect(Pair.WhitePlayer);
-   //IdTCPServer1Disconnect(Pair.BlackPlayer)
+   ActivePlayers[Pair.BlackLogin]:=false;
+   ActivePlayers[Pair.WhiteLogin]:=false;
   end;
 
 
@@ -574,13 +606,7 @@ begin
 
 
 
-
-
-end;
-
-
-
-
+  RefreshPlayerGrid;
 
 end;
 
@@ -657,6 +683,12 @@ begin
 
   end;
 
+  if Msg.StartsWith('QUEUELEFT') then
+  begin
+  QueueLeft(AContext);
+  Exit;
+  end;
+
 // Usuń gracza (logout/rozłączenie)
   if Msg.StartsWith('REMOVEPLAYER:') then
   begin
@@ -682,7 +714,11 @@ begin
 
 
 
-
+  if Msg.StartsWith('LEFT') then
+  begin
+  OnPlayerLeft(AContext);
+  Exit;
+  end;
 
 
   if Msg.StartsWith('LOGIN:') then
@@ -853,8 +889,7 @@ begin
       begin
         ListLock.Acquire;
         try
-          ShowMessage('RefreshPlayerGrid: ActivePlayers.Count=' +
-      ActivePlayers.Count.ToString);
+
           // Zbierz wszystkie loginy
           keys := ActivePlayers.Keys.ToArray;
           // Ustaw liczbę wierszy (nagłówek + rekordy)
@@ -882,6 +917,8 @@ begin
       end
     );
 end;
+
+
 
 
 
