@@ -2,15 +2,15 @@ program ChessArena;
 
 uses
   Vcl.Forms,
-  Unit3 in 'Unit3.pas' {Chess},
-  Unit4 in 'Unit4.pas' {Menu},
-  Unit5 in 'Unit5.pas' {RegisterMenu},
-  Unit6 in 'Unit6.pas' {Login},
+  ChessGame in 'ChessGame.pas' {Chess},
+  Main in 'Main.pas' {Menu},
+  RegisterUser in 'RegisterUser.pas' {RegisterMenu},
+  LoginUser in 'LoginUser.pas' {Login},
   UserSession in 'UserSession.pas',
-  Unit7 in 'Unit7.pas' {Profile},
-  Unit8 in 'Unit8.pas' {Form8},
-  Unit9 in 'Unit9.pas' {Form9},
-  Unit11 in 'Unit11.pas' {Form11};
+  ProfileMenu in 'ProfileMenu.pas' {Profile},
+  RankingsLeaderboard in 'RankingsLeaderboard.pas' {Form8},
+  MatchHistory in 'MatchHistory.pas' {Form9},
+  GameTypeMenu in 'GameTypeMenu.pas' {Form11};
 
 {$R *.res}
 
