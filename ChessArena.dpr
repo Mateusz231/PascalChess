@@ -1,4 +1,4 @@
-program Project4;
+program ChessArena;
 
 uses
   Vcl.Forms,

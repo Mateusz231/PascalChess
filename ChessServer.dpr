@@ -1,8 +1,8 @@
-program Project5;
+program ChessServer;
 
 uses
   Vcl.Forms,
-  Unit10 in 'Unit10.pas' {Form10};
+  Server in 'Server.pas' {Form10};
 
 {$R *.res}
 
