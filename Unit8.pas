@@ -9,7 +9,7 @@ uses
   FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf, FireDAC.DApt.Intf,
   FireDAC.Stan.Async, FireDAC.DApt, Data.DB, FireDAC.Comp.DataSet,
   FireDAC.UI.Intf, FireDAC.Stan.Def, FireDAC.Stan.Pool, FireDAC.Phys,
-  FireDAC.Phys.MySQL, FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait;
+  FireDAC.Phys.MySQL, FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait, UserSession;
 
 type
   TLeaderboardForm = class(TForm)
@@ -53,7 +53,18 @@ implementation
 
 procedure TLeaderboardForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  Application.Terminate;
+if UserSession.Logged then
+begin
+UserSession.Logout;
+Application.terminate;
+end
+
+else
+begin
+Application.terminate;
+end;
+
+
 end;
 
 procedure TLeaderboardForm.FormCreate(Sender: TObject);

@@ -81,7 +81,18 @@ end;
 
 procedure TLogin.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+if UserSession.Logged then
+begin
+UserSession.Logout;
 Application.terminate;
+end
+
+else
+begin
+Application.terminate;
+end;
+
+
 end;
 
 procedure TLogin.FormCreate(Sender: TObject);

@@ -259,8 +259,20 @@ begin
 end;
 
 procedure TMatchHistoryForm.FormClose(Sender: TObject; var Action: TCloseAction);
+
 begin
-  Application.Terminate;
+if UserSession.Logged then
+begin
+UserSession.Logout;
+Application.terminate;
+end
+
+else
+begin
+Application.terminate;
+end;
+
+
 end;
 
 end.

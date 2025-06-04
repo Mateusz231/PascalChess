@@ -10,7 +10,7 @@ uses
   FireDAC.Stan.Async, FireDAC.Phys, FireDAC.VCLUI.Wait, Data.DB,
   FireDAC.Comp.Client, FireDAC.Phys.MySQLDef, FireDAC.Phys.MySQL,
   FireDAC.Stan.Param, FireDAC.DatS, FireDAC.DApt.Intf, FireDAC.DApt,
-  FireDAC.Comp.DataSet, System.Hash;
+  FireDAC.Comp.DataSet, System.Hash, UserSession;
 
 type
   TRegisterMenu = class(TForm)
@@ -29,6 +29,7 @@ type
     procedure FormCreate(Sender: TObject);
     procedure FormResize(Sender: TObject);
     procedure RegisterButtonClick(Sender: TObject);
+
 
   private
       function HashPassword(const Password: string): string;
@@ -51,8 +52,20 @@ Application.MainForm.Show;
 end;
 
 procedure TRegisterMenu.FormClose(Sender: TObject; var Action: TCloseAction);
+
+begin
+if UserSession.Logged then
+begin
+UserSession.Logout;
+Application.terminate;
+end
+
+else
 begin
 Application.terminate;
+end;
+
+
 end;
 
 procedure TRegisterMenu.FormCreate(Sender: TObject);
@@ -60,6 +73,8 @@ begin
 Image1.SendToBack;
 FormResize(self);
 end;
+
+
 
 
 function TRegisterMenu.HashPassword(const Password: string): string;
