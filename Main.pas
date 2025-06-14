@@ -60,6 +60,7 @@ end
 else
 begin
 Self.Hide;
+GameType.RefreshPlayerList;
 GameType.Show;
 end;
 
@@ -106,17 +107,20 @@ procedure TMainMenu.ButtonExit5Click(Sender: TObject);
 begin
 if UserSession.Logged then
 begin
+UserSession.ShutDown:=true;
 UserSession.Logout;
-Application.Terminate;
+Application.terminate;
 end
 
 else
 begin
-Application.Terminate;
+UserSession.ShutDown:=true;
+Application.terminate;
 end;
 
 
 
+Application.Terminate;
 
 end;
 
@@ -144,12 +148,14 @@ procedure TMainMenu.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
 if UserSession.Logged then
 begin
+UserSession.ShutDown:=true;
 UserSession.Logout;
 Application.terminate;
 end
 
 else
 begin
+UserSession.ShutDown:=true;
 Application.terminate;
 end;
 

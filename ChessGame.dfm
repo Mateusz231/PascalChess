@@ -62,15 +62,8 @@ object Chess: TChess
     TabOrder = 0
     OnClick = PanelClick
   end
-  object IdTCPClient1: TIdTCPClient
-    ConnectTimeout = 0
-    Host = '127.0.0.1'
-    Port = 6000
-    ReadTimeout = -1
-    Left = 624
-    Top = 328
-  end
   object Timer1: TTimer
+    Enabled = False
     OnTimer = Timer1Timer
     Left = 536
     Top = 392

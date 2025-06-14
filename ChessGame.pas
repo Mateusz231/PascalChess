@@ -22,7 +22,6 @@ type
 
   TChess = class(TForm)
     Panel: TPanel;
-    IdTCPClient1: TIdTCPClient;
     Timer1: TTimer;
     YourLogin: TLabel;
     YourRanking: TLabel;
@@ -196,24 +195,24 @@ begin
 
   Application.Title:='Chess';
 
-    IdTCPClient1:= UserSession.IdTCPClient1;
 
-     if not IdTCPClient1.Connected then
+
+     if not UserSession.IdTCPClient1.Connected then
     begin
     ShowMessage('Błąd połączenia z serwerem.');
-    FreeMemory;
+   // FreeMemory;
     Self.Close;
     Exit;
     end;
 
-    IdTCPClient1.IOHandler.WriteLn('LOGIN:' + LoginName);
-    IdTCPClient1.IOHandler.WriteLn('ID:' + IntToStr(UserSession.LoggedUserID));
-    IdTCPClient1.IOHandler.WriteLn('MODE:'+IntToStr(GameType));
+    UserSession.IdTCPClient1.IOHandler.WriteLn('LOGIN:' + LoginName);
+    UserSession.IdTCPClient1.IOHandler.WriteLn('ID:' + IntToStr(UserSession.LoggedUserID));
+    UserSession.IdTCPClient1.IOHandler.WriteLn('MODE:'+IntToStr(GameType));
 
     // Debug – poczekaj na odpowiedź serwera
-    while not IdTCPClient1.IOHandler.InputBufferIsEmpty do
+    while not UserSession.IdTCPClient1.IOHandler.InputBufferIsEmpty do
     begin
-      var msg := Trim(IdTCPClient1.IOHandler.ReadLn);
+      var msg := Trim(UserSession.IdTCPClient1.IOHandler.ReadLn);
       ShowMessage('Odpowiedź od serwera: ' + msg);
     end;
 
@@ -237,21 +236,19 @@ end;
 
 procedure TChess.FormDestroy(Sender: TObject);
 begin
-//  if IdTCPClient1.Connected then IdTCPClient1.Disconnect;
+
   if InGame and not Win then
   begin
 
   SendMove('LEFT');
-
- // IdTCPClient1.IOHandler.WriteLn('LEFT');
   SendMove('ENDGAME:LOSE');
-  FreeMemory;
+  //FreeMemory;
   end
 
   else
   begin
-  SendMove('QUEUELEFT');
-  FreeMemory;
+  SendMove('QUEUELEFT:'+UserSession.LoggedUserLogin);
+ // FreeMemory;
   end;
 
 
@@ -637,8 +634,8 @@ begin
 
       UpdateClockLabels;
     Elapsed := SecondsBetween(Now, TurnStartTime);
-    if IdTCPClient1.Connected then
-      IdTCPClient1.IOHandler.WriteLn('TIME:' + IntToStr(Elapsed));
+    if UserSession.IdTCPClient1.Connected then
+      UserSession.IdTCPClient1.IOHandler.WriteLn('TIME:' + IntToStr(Elapsed));
 
 
 
@@ -701,8 +698,8 @@ end;
 
 procedure TChess.SendMove(const Move: string);
 begin
-  if IdTCPClient1.Connected then
-    IdTCPClient1.IOHandler.WriteLn(Move);
+  if UserSession.IdTCPClient1.Connected then
+    UserSession.IdTCPClient1.IOHandler.WriteLn(Move);
 end;
 
 
@@ -714,15 +711,15 @@ var
   wPart, bPart: string;
   sr, sc, tr, tc: Integer;
 begin
-  if not IdTCPClient1.Connected then Exit;
+  if not UserSession.IdTCPClient1.Connected then Exit;
 
   // 1) Sprawdź, czy są dane
-  if IdTCPClient1.IOHandler.InputBufferIsEmpty then
-    IdTCPClient1.IOHandler.CheckForDataOnSource(1);
-  if IdTCPClient1.IOHandler.InputBufferIsEmpty then Exit;
+  if UserSession.IdTCPClient1.IOHandler.InputBufferIsEmpty then
+    UserSession.IdTCPClient1.IOHandler.CheckForDataOnSource(1);
+  if UserSession.IdTCPClient1.IOHandler.InputBufferIsEmpty then Exit;
 
   // 2) Odczytujemy pierwszy pakiet
-  Msg := Trim(IdTCPClient1.IOHandler.ReadLn('', 50));
+  Msg := Trim(UserSession.IdTCPClient1.IOHandler.ReadLn('', 50));
   if Msg = '' then Exit;
 
   // 3) Obsługa TIME_UPDATE
@@ -739,13 +736,13 @@ begin
 
     UpdateTimers;
 
-
+    //
 
 
     // 4) Od razu próbujemy odczytać drugi pakiet
-    if not IdTCPClient1.IOHandler.InputBufferIsEmpty then
+    if not UserSession.IdTCPClient1.IOHandler.InputBufferIsEmpty then
     begin
-      FollowUp := Trim(IdTCPClient1.IOHandler.ReadLn('', 50));
+      FollowUp := Trim(UserSession.IdTCPClient1.IOHandler.ReadLn('', 50));
       if FollowUp <> '' then
       begin
         // sprawdzamy kolejno możliwe typy
@@ -762,6 +759,11 @@ begin
               CheckEndGame;
               LastSrc := Point(sc, sr);
               LastDst := Point(tc, tr);
+
+              IsMyTurn := True;
+              TurnStartTime := Now;
+              UpdateTimers;
+
               if Lost then
               begin
               ShowMessage('You lost by checkmate!');
@@ -770,11 +772,6 @@ begin
               tmrBlack.Enabled := False;
               InGame:= False;
               end;
-
-              IsMyTurn := True;
-              TurnStartTime := Now;
-              UpdateTimers;
-
 
 
 
@@ -843,7 +840,12 @@ begin
         CheckEndGame;
         LastSrc := Point(sc, sr);
         LastDst := Point(tc, tr);
-        if Lost then
+
+        IsMyTurn := True;
+        TurnStartTime := Now;
+        UpdateTimers;
+
+          if Lost then
         begin
          ShowMessage('You lost by checkmate!');
          DisableBoard;
@@ -851,9 +853,6 @@ begin
          tmrBlack.Enabled := False;
          InGame:= false;
         end;
-        IsMyTurn := True;
-        TurnStartTime := Now;
-        UpdateTimers;
 
 
 
@@ -1589,6 +1588,7 @@ end;
 
 
 
+
 function TChess.IsLegalMove(srcRow, srcCol, dstRow, dstCol: Integer): Boolean;
 var
   savedSrc, savedDst: TPiece;
@@ -1616,6 +1616,7 @@ begin
   // 5) Przywracamy planszę
   BoardState[srcRow, srcCol] := savedSrc;
   BoardState[dstRow, dstCol] := savedDst;
+
 end;
 
 
@@ -2055,8 +2056,8 @@ var
 begin
   text := Trim(edtChat.Text);
   if text = '' then Exit;
-  if IdTCPClient1.Connected then
-    IdTCPClient1.IOHandler.WriteLn('CHAT:' + text);
+  if UserSession.IdTCPClient1.Connected then
+    UserSession.IdTCPClient1.IOHandler.WriteLn('CHAT:' + text);
   edtChat.Clear;
   edtChat.SetFocus;
 end;
@@ -2089,12 +2090,19 @@ OppRanking.Caption:='';
 
 
 
+
+if assigned(UserSession.IdTCPClient1) and UserSession.IdTCPClient1.Connected then
+begin
+UserSession.IdTCPClient1.IOHandler.InputBuffer.Clear;
+end;
+
+
 FreeAndNil(memChat);
 FreeAndNil(edtChat);
 FreeAndNil(btnSend);
 FreeAndNil(pnlChat);
-FreeAndNil(lstMoves);
-FreeAndNil(MovesList);
+//FreeAndNil(lstMoves);
+//FreeAndNil(MovesList);
 
 
 

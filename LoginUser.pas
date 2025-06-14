@@ -29,7 +29,6 @@ type
     FDQuery1: TFDQuery;
     FDConnection1: TFDConnection;
     FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink;
-    IdTCPClient1: TIdTCPClient;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormCreate(Sender: TObject);
     procedure FormResize(Sender: TObject);
@@ -155,15 +154,15 @@ begin
   if not EnsureConnected then
     Exit('');
   // bez kodowania
-  IdTCPClient1.IOHandler.WriteLn(Cmd);
-    Result := IdTCPClient1.IOHandler.ReadLn('', 500);
+  UserSession.IdTCPClient1.IOHandler.WriteLn(Cmd);
+    Result := UserSession.IdTCPClient1.IOHandler.ReadLn('', 500);
 end;
 
 
 
 procedure TLogin.ServerRemovePlayer(const Username: string);
 begin
-  if IdTCPClient1.Connected then
+  if UserSession.IdTCPClient1.Connected then
     SendServerCommand('REMOVEPLAYER:' + Username);
 end;
 
@@ -188,12 +187,11 @@ end;
 function TLogin.EnsureConnected: Boolean;
 begin
   Result := True;
-  if not IdTCPClient1.Connected then
+  if not UserSession.IdTCPClient1.Connected then
     try
-      IdTCPClient1.Host := '127.0.0.1';
-      IdTCPClient1.Port := 5000;
-      IdTCPClient1.Connect;
-      UserSession.IdTCPClient1:= Self.IdTCPClient1;
+      UserSession.IdTCPClient1.Host := '127.0.0.1';
+      UserSession.IdTCPClient1.Port := 5000;
+      UserSession.IdTCPClient1.Connect;
     except
       on E: Exception do
       begin

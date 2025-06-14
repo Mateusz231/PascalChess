@@ -1317,12 +1317,4 @@ object Login: TLogin
     Left = 808
     Top = 440
   end
-  object IdTCPClient1: TIdTCPClient
-    ConnectTimeout = 0
-    Host = '127.0.0.1'
-    Port = 6000
-    ReadTimeout = -1
-    Left = 648
-    Top = 416
-  end
 end

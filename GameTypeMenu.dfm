@@ -11,6 +11,9 @@ object GameType: TGameType
   Font.Name = 'Segoe UI'
   Font.Style = []
   OnClose = FormClose
+  OnCreate = FormCreate
+  OnResize = FormResize
+  OnShow = FormShow
   TextHeight = 15
   object Image1: TImage
     Left = 0
@@ -1269,5 +1272,12 @@ object GameType: TGameType
     Caption = 'BULLET'
     TabOrder = 2
     OnClick = Button3Click
+  end
+  object PlayerList: TScrollBox
+    Left = 840
+    Top = 448
+    Width = 185
+    Height = 41
+    TabOrder = 3
   end
 end

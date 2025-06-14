@@ -11,6 +11,7 @@ var
   LoggedUserLogin: string;
   Logged: Boolean;
   IdTCPClient1: TIdTCPClient;
+  ShutDown: Boolean;
 
 implementation
 
@@ -31,6 +32,19 @@ begin
 
 
 
+
+
 end;
+
+initialization
+  IdTCPClient1 := TIdTCPClient.Create(nil); // Tworzony na starcie aplikacji
+
+
+finalization
+IdTCPClient1.Free;
+
+
+
+
 
 end.
