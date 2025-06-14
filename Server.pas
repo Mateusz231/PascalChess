@@ -11,7 +11,7 @@ uses
   FireDAC.DApt.Intf, FireDAC.Stan.Async, FireDAC.DApt, FireDAC.UI.Intf,
   FireDAC.Stan.Def, FireDAC.Stan.Pool, FireDAC.Phys, FireDAC.Phys.MySQL,
   FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait, Data.DB, FireDAC.Comp.Client,
-  FireDAC.Comp.DataSet, Vcl.Grids;
+  FireDAC.Comp.DataSet, Vcl.Grids, System.Math;
 
 type
   /// Informacje o graczu oczekującym na parę
@@ -47,6 +47,7 @@ type
     ActivePairs: TList<TPlayerPair>;
     ListLock: TCriticalSection;
     ActivePlayers: TDictionary<string, boolean>;
+    ContextToLogin: TDictionary<TIdContext,string>;
 
     procedure TryPairRapid;
     procedure TryPairBlitz;
@@ -122,7 +123,8 @@ begin
   WaitingBullet := TList<TPlayerInfo>.Create;
   ActivePairs    := TList<TPlayerPair>.Create;
   ListLock       := TCriticalSection.Create;
-  ActivePlayerS:= TDictionary<string, boolean>.Create();
+  ActivePlayers:= TDictionary<string, boolean>.Create();
+  ContextToLogin:= TDictionary<TidContext, string>.Create();
 
   // Ustawienia MemoLog
   MemoLog.Clear;
@@ -147,6 +149,7 @@ begin
   WaitingBullet.Free;
   ActivePairs.Free;
   ActivePlayers.Free;
+  ContextToLogin.Free;
   Log('Serwer zatrzymany');
 end;
 
@@ -158,8 +161,28 @@ end;
 
 
 procedure TForm10.IdTCPServer1Disconnect(AContext: TIdContext);
+var
+Login: string;
+
 begin
   Log('Rozłączono ' + AContext.Binding.PeerIP + ':' + AContext.Binding.PeerPort.ToString);
+
+  if ContextToLogin.TryGetValue(AContext, Login) then
+  begin
+    Log('Gracz rozłączony: ' + Login);
+
+    ContextToLogin.Remove(AContext);
+    ActivePlayers.Remove(Login);
+  end
+
+  else
+  begin
+    // Jeśli tutaj wpadniesz, to znaczy, że nigdy nie mapowałeś tego kontekstu
+    Log('Nieznany kontekst rozłączony (brak loginu)');
+  end;
+
+
+
 end;
 
 
@@ -173,7 +196,6 @@ begin
   ListLock.Acquire;
 
   try
- //  ActivePlayers.Remove();
     // Szukamy pary zawierającej tego gracza
     for i := ActivePairs.Count - 1 downto 0 do
     begin
@@ -187,6 +209,7 @@ begin
         if ActivePlayers.ContainsKey(Pair.WhiteLogin) then
         begin
           ActivePlayers[Pair.WhiteLogin]:=false;
+          ActivePlayers[Pair.BlackLogin]:=false;
         end;
 
         end
@@ -198,6 +221,7 @@ begin
           if ActivePlayers.ContainsKey(Pair.BlackLogin) then
         begin
           ActivePlayers[Pair.BlackLogin]:=false;
+          ActivePlayers[Pair.WhiteLogin]:=false;
         end;
 
 
@@ -671,20 +695,77 @@ begin
   end;
 
 
+
+
+      if Msg = 'GET_PLAYERS' then
+begin
+  // Dla każdego wpisu w ActivePlayers wyślij osobną linię:
+  for var Login in ActivePlayers.Keys do
+  begin
+
+    var Flag: string;
+    if ActivePlayers[Login] then
+    begin
+    Flag:='1';
+    end
+    else
+    begin
+    Flag:='0';
+    end;
+
+
+    AContext.Connection.IOHandler.WriteLn('PLAYER:' + Login + ':' + Flag);
+  end;
+  AContext.Connection.IOHandler.WriteLn('');
+  Exit;
+end;
+
+
+    if Msg.StartsWith('INVITE:') then
+  begin
+    var IsIdle: boolean;
+    var Target := Msg.Substring(7);
+    // czy ten gracz jest w słowniku i wolny?
+    if ActivePlayers.TryGetValue(Target, IsIdle) and IsIdle then
+    begin
+      // wyślij powiadomienie do zapraszanego
+      for var ctx in ContextToLogin.Keys do
+        if ContextToLogin[ctx] = Target then
+          ctx.Connection.IOHandler.WriteLn('INVITED_BY:' + ContextToLogin[AContext]);
+
+      // oznacz obu jako zajętych
+      ActivePlayers[ContextToLogin[AContext]] := False;
+      ActivePlayers[Target] := False;
+
+      AContext.Connection.IOHandler.WriteLn('INVITE_SENT:' + Target);
+    end
+    else
+      AContext.Connection.IOHandler.WriteLn('INVITE_FAIL:' + Target);
+
+    RefreshPlayerGrid;
+    Exit;
+  end;
+
+
+
+
+
   // Dodaj gracza do słownika (jeszcze nie w grze)
   if Msg.StartsWith('ADDPLAYER:') then
   begin
   var user := Msg.Substring(10);
   if not ActivePlayers.ContainsKey(user) then
   ActivePlayers.Add(user, False);
+  ContextToLogin.Add(Acontext,user);
   //AContext.Connection.IOHandler.WriteLn('OK');
     RefreshPlayerGrid;
   Exit;
 
   end;
 
-  if Msg.StartsWith('QUEUELEFT') then
+  if Msg.StartsWith('QUEUELEFT:') then
   begin
+  ActivePlayers[(Msg.Substring(10))]:=false;
   QueueLeft(AContext);
   Exit;
   end;
