@@ -69,6 +69,7 @@ end;
 
 procedure TLeaderboardForm.FormCreate(Sender: TObject);
 begin
+ FDPhysMySQLDriverLink1.VendorLib := ExtractFilePath(Application.ExeName) + 'libmysql.dll';
     Color := clBlack;
   Font.Color := clWhite;
   Font.Size := 10;

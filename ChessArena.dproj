@@ -156,6 +156,7 @@
             <Form>Form11</Form>
             <FormType>dfm</FormType>
         </DCCReference>
+        <DCCReference Include="UCIEngine.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -190,9 +191,9 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="Win64\Debug\ChessArena.rsm" Configuration="Debug" Class="DebugSymbols">
+                <DeployFile LocalName="Win64\Release\ChessArena.exe" Configuration="Release" Class="ProjectOutput">
                     <Platform Name="Win64">
-                        <RemoteName>ChessArena.rsm</RemoteName>
+                        <RemoteName>ChessArena.exe</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>

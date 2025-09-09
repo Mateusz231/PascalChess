@@ -55,9 +55,6 @@ object Form10: TForm10
     Top = 32
   end
   object FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink
-    VendorLib = 
-      'C:\Users\Mateusz\Documents\Embarcadero\Studio\Projects\libmysql.' +
-      'dll'
     Left = 128
     Top = 32
   end

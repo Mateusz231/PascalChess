@@ -73,9 +73,6 @@ object MatchHistoryForm: TMatchHistoryForm
     Top = 392
   end
   object FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink
-    VendorLib = 
-      'C:\Users\Mateusz\Documents\Embarcadero\Studio\Projects\libmysql.' +
-      'dll'
     Left = 880
     Top = 464
   end

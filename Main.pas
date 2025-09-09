@@ -53,18 +53,17 @@ uses  LoginUser,ProfileMenu, RankingsLeaderboard, MatchHistory, GameTypeMenu;
 procedure TMainMenu.ButtonPlay1Click(Sender: TObject);
 begin
 
-if not UserSession.Logged then
-begin
-ShowMessage('Currently you are not logged');
-end
-else
-begin
+
 Self.Hide;
+if not Assigned(GameType) then
+GameType := TGameType.Create(nil);
+
+
 GameType.RefreshPlayerList;
 GameType.Show;
 end;
 
-end;
+
 
 
 procedure TMainMenu.ButtonProfile2Click(Sender: TObject);

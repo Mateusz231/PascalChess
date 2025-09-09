@@ -10,7 +10,8 @@ uses
   ProfileMenu in 'ProfileMenu.pas' {Profile},
   RankingsLeaderboard in 'RankingsLeaderboard.pas' {Form8},
   MatchHistory in 'MatchHistory.pas' {Form9},
-  GameTypeMenu in 'GameTypeMenu.pas' {Form11};
+  GameTypeMenu in 'GameTypeMenu.pas' {Form11},
+  UCIEngine in 'UCIEngine.pas';
 
 {$R *.res}
 

@@ -101,6 +101,7 @@ end;
 
 procedure TForm10.FormCreate(Sender: TObject);
 begin
+   FDPhysMySQLDriverLink1.VendorLib := ExtractFilePath(Application.ExeName) + 'libmysql.dll';
   Randomize;
 
   Application.title:='Server';
@@ -182,6 +183,7 @@ begin
   end;
 
 
+  RefreshPlayerGrid;
 
 end;
 

@@ -1237,10 +1237,7 @@ object RegisterMenu: TRegisterMenu
       63F9885C51456E8939F9914741DEA2C0A28A97B9486E3922947AFAD145086495
       2AA8242F6A28A6C47FFFD9}
     Stretch = True
-    ExplicitLeft = 184
-    ExplicitTop = 296
-    ExplicitWidth = 105
-    ExplicitHeight = 105
+    ExplicitTop = 8
   end
   object LoginLabel: TLabel
     Left = 368
@@ -1301,9 +1298,6 @@ object RegisterMenu: TRegisterMenu
     Top = 344
   end
   object FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink
-    VendorLib = 
-      'C:\Users\Mateusz\Documents\Embarcadero\Studio\Projects\libmysql.' +
-      'dll'
     Left = 808
     Top = 440
   end

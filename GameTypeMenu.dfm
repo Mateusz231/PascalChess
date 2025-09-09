@@ -1245,7 +1245,7 @@ object GameType: TGameType
   end
   object Button1: TButton
     Left = 440
-    Top = 153
+    Top = 105
     Width = 249
     Height = 96
     Cursor = crHandPoint
@@ -1255,7 +1255,7 @@ object GameType: TGameType
   end
   object Button2: TButton
     Left = 440
-    Top = 271
+    Top = 215
     Width = 249
     Height = 90
     Cursor = crHandPoint
@@ -1265,7 +1265,7 @@ object GameType: TGameType
   end
   object Button3: TButton
     Left = 440
-    Top = 385
+    Top = 319
     Width = 249
     Height = 88
     Cursor = crHandPoint
@@ -1279,5 +1279,14 @@ object GameType: TGameType
     Width = 185
     Height = 41
     TabOrder = 3
+  end
+  object Button4: TButton
+    Left = 440
+    Top = 432
+    Width = 249
+    Height = 88
+    Cursor = crHandPoint
+    Caption = 'AI'
+    TabOrder = 4
   end
 end

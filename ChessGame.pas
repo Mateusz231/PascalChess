@@ -42,6 +42,7 @@ type
     procedure PanelClick(Sender: TObject);
     procedure FormResize(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
 
 
 
@@ -233,6 +234,11 @@ begin
   Timer1.Interval := 200;
 end;
 
+
+procedure TChess.FormCreate(Sender: TObject);
+begin
+FDPhysMySQLDriverLink1.VendorLib := ExtractFilePath(Application.ExeName) + 'libmysql.dll';
+end;
 
 procedure TChess.FormDestroy(Sender: TObject);
 begin

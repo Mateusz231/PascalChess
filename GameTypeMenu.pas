@@ -13,7 +13,8 @@ type
     Button1: TButton;
     Button2: TButton;
     Button3: TButton;
-    PlayerList: TScrollBox; // <--- dodaj
+    PlayerList: TScrollBox;
+    Button4: TButton;
 
 
 
@@ -24,11 +25,12 @@ type
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormResize(Sender: TObject);
-
+    procedure InviteClick(Sender: TObject);
 
   private
   ActivePlayers: TDictionary<string, boolean>;
   procedure ChessCloseHandler(Sender: TObject; var Action: TCloseAction);
+  function SelectGameMode(out Mode: Integer): Boolean;
 
   public
   procedure RefreshPlayerList;
@@ -45,6 +47,14 @@ uses ChessGame, Main, UserSession;
 
 procedure TGameType.Button1Click(Sender: TObject);
 begin
+
+if not UserSession.Logged then
+begin
+ShowMessage('Currently you are not logged');
+end
+else
+ begin
+
   Self.Hide;  // chowasz GameType
   // Tworzysz now¹ instancjê gry
   Chess := TChess.Create(nil);
@@ -55,8 +65,18 @@ begin
   // Poka¿ formê gry
   Chess.Show;
 end;
+end;
+
 
 procedure TGameType.Button2Click(Sender: TObject);
+begin
+
+
+if not UserSession.Logged then
+begin
+ShowMessage('Currently you are not logged');
+end
+else
 begin
  Self.Hide;
 
@@ -69,7 +89,19 @@ begin
   Chess.Show;
 end;
 
+
+
+end;
+
+
 procedure TGameType.Button3Click(Sender: TObject);
+begin
+
+if not UserSession.Logged then
+begin
+ShowMessage('Currently you are not logged');
+end
+else
 begin
  Self.Hide;
 
@@ -81,11 +113,16 @@ begin
 
   Chess.Show;
 end;
+end;
+
+
+
 
 procedure TGameType.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-
+  //UserSession.IdTCPClient1.IOHandler.InputBuffer.Clear;
   Action:= caFree;
+  GameType := nil;
   Application.MainForm.Show;
 end;
 
@@ -95,18 +132,15 @@ begin
   Image1.Align := alClient;
   Image1.SendToBack;
 
-
-  // Dodaj ScrollBox po prawej
- // PlayerList := TScrollBox.Create(Self);
   PlayerList.Parent := Self;
   PlayerList.Align := alRight;
   PlayerList.Width := 250;
   PlayerList.BorderStyle := bsNone;
   PlayerList.VertScrollBar.Tracking := True;
 
+  PlayerList.Color:= clDkGray;
 
   ActivePlayers := TDictionary<string, Boolean>.Create;
- // Resize;
 
 end;
 
@@ -124,11 +158,9 @@ begin
   BtnX := (LeftAreaWidth - Button1.Width) div 2;
 
   Button1.SetBounds(BtnX, StartY, Button1.Width, Button1.Height);
-  Button2.SetBounds(BtnX, StartY + Button1.Height + Spacing,
-                    Button2.Width, Button2.Height);
-  Button3.SetBounds(BtnX, StartY + Button1.Height + Spacing + Button2.Height + Spacing,
-                    Button3.Width, Button3.Height);
-  RefreshPlayerList;
+  Button2.SetBounds(BtnX, StartY + Button1.Height + Spacing, Button2.Width, Button2.Height);
+  Button3.SetBounds(BtnX, StartY + Button1.Height + Spacing + Button2.Height + Spacing, Button3.Width, Button3.Height);
+  Button4.SetBounds(BtnX, StartY + Button1.Height + Spacing + Button2.Height + Spacing + Button3.Height + Spacing, Button4.Width, Button4.Height);
 
 end;
 
@@ -136,9 +168,6 @@ end;
 procedure TGameType.FormShow(Sender: TObject);
 begin
 Resize;
-
-  // UserSession.IdTCPClient1.IOHandler.WriteLn('GET_PLAYERS');
-
 end;
 
 procedure TGameType.ChessCloseHandler(Sender: TObject; var Action: TCloseAction);
@@ -158,6 +187,87 @@ begin
   //
 end;
 
+function TGameType.SelectGameMode(out Mode: Integer): Boolean;
+var
+  Dlg: TForm;
+  BtnRapid, BtnBlitz, BtnBullet: TButton;
+begin
+  Result := False;
+  Mode := 0;
+
+  Dlg := CreateMessageDialog('Select game mode to invite:', mtInformation, []);
+  try
+    Dlg.Caption := 'Choose Game Mode';
+
+    // RAPID
+    BtnRapid := TButton.Create(Dlg);
+    BtnRapid.Parent := Dlg;
+    BtnRapid.Caption := 'Rapid';
+    BtnRapid.ModalResult := 101;
+    BtnRapid.Left := 18;
+    BtnRapid.Top := 70;
+    BtnRapid.Width := 75;
+
+    // BLITZ
+    BtnBlitz := TButton.Create(Dlg);
+    BtnBlitz.Parent := Dlg;
+    BtnBlitz.Caption := 'Blitz';
+    BtnBlitz.ModalResult := 102;
+    BtnBlitz.Left := BtnRapid.Left + BtnRapid.Width;
+    BtnBlitz.Top := 70;
+    BtnBlitz.Width := 75;
+
+    // BULLET
+    BtnBullet := TButton.Create(Dlg);
+    BtnBullet.Parent := Dlg;
+    BtnBullet.Caption := 'Bullet';
+    BtnBullet.ModalResult := 103;
+    BtnBullet.Left := BtnBlitz.Left + BtnBlitz.Width;
+    BtnBullet.Top := 70;
+    BtnBullet.Width := 75;
+
+    Dlg.Height := 150;
+    Dlg.Width := 280;
+    Dlg.Position := poScreenCenter;
+
+    case Dlg.ShowModal of
+      101: begin Mode := 1; Result := True; end;
+      102: begin Mode := 2; Result := True; end;
+      103: begin Mode := 3; Result := True; end;
+    end;
+  finally
+    Dlg.Free;
+  end;
+end;
+
+
+
+
+procedure TGameType.InviteClick(Sender: TObject);
+var
+  Btn: TButton;
+  Login: string;
+  Mode: Integer;
+begin
+  Btn := Sender as TButton;
+  Login := Btn.Hint;
+
+  if not SelectGameMode(Mode) then
+    Exit;
+
+  try
+    UserSession.IdTCPClient1.IOHandler.WriteLn('INVITE:' + Login + ':' + IntToStr(Mode));
+    ShowMessage('Invitation sent to ' + Login);
+  except
+    on E: Exception do
+      ShowMessage('Error sending invite: ' + E.Message);
+  end;
+end;
+
+
+
+
+
 
 
 procedure TGameType.RefreshPlayerList;
@@ -168,12 +278,11 @@ var
   Lbl: TLabel;
   PlayerName: string;
   InGame: Boolean;
-
-    Line: string;
+  Line: string;
   Parts: TArray<string>;
   login: string;
   flag: string;
- // inGame: Boolean;
+
 begin
 
     ActivePlayers.Clear;
@@ -243,17 +352,24 @@ begin
     Panel.Left := 10;
     Panel.BevelOuter := bvNone;
 
-    Lbl := TLabel.Create(Self);
-    Lbl.Parent := Panel;
-    Lbl.Caption := PlayerName;
-    Lbl.Left := 10;
-    Lbl.Top := 10;
+    lbl := TLabel.Create(Self);
+    lbl.Parent := Panel;
+    lbl.Caption := PlayerName;
+    lbl.SetBounds(0, 0, Panel.Width div 2, 24);
+    lbl.Font.Name := 'Segoe UI';
+    lbl.Font.Size := 20;
+    lbl.Font.Color := clNavy;
 
-    Btn := TButton.Create(Self);
-    Btn.Parent := Panel;
+    if PlayerName = UserSession.LoggedUserLogin then
+    begin
 
+    end
+    else
+    begin
+        btn := TButton.Create(Self);
+    btn.Parent := Panel;
 
-     If InGame Then
+    If InGame Then
      begin
         Btn.Caption :='InGame';
      end
@@ -262,15 +378,44 @@ begin
      Btn.Caption:='Invite';
      end;
 
+
+
+    btn.SetBounds(Panel.Width - 72 - 8, 4, 72, 32);
+    btn.Font.Color := clWhite;
     Btn.Enabled := not InGame;
     Btn.Top := 5;
     Btn.Left := Panel.Width - Btn.Width - 10;
-    Btn.Tag := Integer(Pointer(PChar(PlayerName))); // do ewentualnej obs³ugi klikniêcia
-    // Btn.OnClick := @OnInviteClick; // Mo¿na dodaæ osobn¹ procedurê
+    Btn.Hint:= PlayerName;
+    Btn.Tag := Integer(Pointer(PChar(PlayerName)));
+    Btn.OnClick :=InviteClick;
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    end;
     Inc(PosY, Panel.Height + 5);
+
   end;
 end;
+
+
+
+
+
+
+
+
 
 
 

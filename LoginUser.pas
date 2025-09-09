@@ -96,6 +96,7 @@ end;
 
 procedure TLogin.FormCreate(Sender: TObject);
 begin
+FDPhysMySQLDriverLink1.VendorLib := ExtractFilePath(Application.ExeName) + 'libmysql.dll';
 Application.Title:='Log in';
 Image1.SendToBack;
 FormResize(self);

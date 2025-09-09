@@ -10,6 +10,7 @@ object Chess: TChess
   Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
+  OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnResize = FormResize
   OnShow = FormShow
@@ -82,9 +83,6 @@ object Chess: TChess
     Top = 344
   end
   object FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink
-    VendorLib = 
-      'C:\Users\Mateusz\Documents\Embarcadero\Studio\Projects\libmysql.' +
-      'dll'
     Left = 808
     Top = 440
   end

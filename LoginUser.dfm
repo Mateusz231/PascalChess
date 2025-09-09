@@ -1311,9 +1311,6 @@ object Login: TLogin
     Top = 344
   end
   object FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink
-    VendorLib = 
-      'C:\Users\Mateusz\Documents\Embarcadero\Studio\Projects\libmysql.' +
-      'dll'
     Left = 808
     Top = 440
   end
