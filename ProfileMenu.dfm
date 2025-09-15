@@ -158,13 +158,11 @@ object Profile: TProfile
       'Database=pascalchess'
       'User_Name=root'
       'DriverID=MySQL')
+    LoginPrompt = False
     Left = 880
     Top = 392
   end
   object FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink
-    VendorLib = 
-      'C:\Users\Mateusz\Documents\Embarcadero\Studio\Projects\libmysql.' +
-      'dll'
     Left = 880
     Top = 464
   end

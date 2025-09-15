@@ -79,6 +79,7 @@ object Chess: TChess
       'Database=pascalchess'
       'User_Name=root'
       'DriverID=MySQL')
+    LoginPrompt = False
     Left = 800
     Top = 344
   end

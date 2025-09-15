@@ -71,6 +71,7 @@ end;
 procedure TRegisterMenu.FormCreate(Sender: TObject);
 begin
 FDPhysMySQLDriverLink1.VendorLib := ExtractFilePath(Application.ExeName) + 'libmysql.dll';
+FDConnection1.Connected := False;
 Image1.SendToBack;
 FormResize(self);
 end;

@@ -71,6 +71,8 @@ end;
 
 procedure TProfile.FormCreate(Sender: TObject);
 begin
+ FDPhysMySQLDriverLink1.VendorLib := ExtractFilePath(Application.ExeName) + 'libmysql.dll';
+ FDConnection1.Connected := False;
   Color := $00202020; // ciemnoszare t³o
   Font.Name := 'Segoe UI';
   Font.Size := 10;

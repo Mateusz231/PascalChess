@@ -622,6 +622,7 @@ begin
 
   else
   begin
+   Log(Msg);
    Pair.WhitePlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
    ActivePlayers[Pair.BlackLogin]:=false;
    ActivePlayers[Pair.WhiteLogin]:=false;

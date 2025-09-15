@@ -74,6 +74,7 @@ ShowMessage('Currently you are not logged');
 end
 else
 begin
+Profile:=TProfile.Create(self);
 Self.Hide;
 Profile.Show;
 end;
@@ -89,6 +90,7 @@ ShowMessage('Currently you are not logged');
 end
 else
 begin
+MatchHistoryForm:=TMatchHistoryForm.Create(self);
 Self.Hide;
 MatchHistoryForm.Show;
 end;
@@ -98,6 +100,7 @@ end;
 
 procedure TMainMenu.ButtonLeaderboard4Click(Sender: TObject);
 begin
+LeaderboardForm:=TLeaderboardForm.Create(self);
 Self.Hide;
 LeaderboardForm.Show;
 end;
@@ -125,12 +128,14 @@ end;
 
 procedure TMainMenu.ButtonLogin6Click(Sender: TObject);
 begin
+Login:=TLogin.Create(self);
 Self.Hide;
 Login.Show;
 end;
 
 procedure TMainMenu.ButtonRegister7Click(Sender: TObject);
 begin
+RegisterMenu:= TRegisterMenu.Create(self);
 Self.Hide;
 RegisterMenu.Show;
 end;

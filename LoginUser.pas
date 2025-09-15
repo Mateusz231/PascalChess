@@ -8,11 +8,11 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Imaging.jpeg,
   Vcl.ExtCtrls, FireDAC.Stan.Intf, FireDAC.Stan.Option, FireDAC.Stan.Param,
-  FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf, FireDAC.DApt.Intf,
+  FireDAC.DatS, FireDAC.Phys.Intf, FireDAC.DApt.Intf,
   FireDAC.Stan.Async, FireDAC.DApt, Data.DB, FireDAC.Comp.DataSet,
   FireDAC.Comp.Client, FireDAC.UI.Intf, FireDAC.Stan.Def, FireDAC.Stan.Pool,
   FireDAC.Phys, FireDAC.Phys.MySQL, FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait, System.Hash, UserSession, Main,
-  IdBaseComponent, IdComponent, IdTCPConnection, IdTCPClient;
+  IdBaseComponent, IdComponent, IdTCPConnection, IdTCPClient, FireDAC.Stan.Error;
 
 
 
@@ -35,7 +35,7 @@ type
     procedure BackButtonClick(Sender: TObject);
     procedure CheckBox1Click(Sender: TObject);
     procedure LoginButtonClick(Sender: TObject);
-    procedure FormKeyPress(Sender: TObject; var Key: Char);
+
 
 
 
@@ -97,19 +97,10 @@ end;
 procedure TLogin.FormCreate(Sender: TObject);
 begin
 FDPhysMySQLDriverLink1.VendorLib := ExtractFilePath(Application.ExeName) + 'libmysql.dll';
+FDConnection1.Connected := False;
 Application.Title:='Log in';
 Image1.SendToBack;
 FormResize(self);
-end;
-
-procedure TLogin.FormKeyPress(Sender: TObject; var Key: Char);
-begin
- MessageDlg(Key + ' has been pressed', mtInformation, [mbOK], 0)
-end;
-
-function TLogin.HashPassword(const Password: string): string;
-begin
-  Result := THashSHA2.GetHashString(Password);
 end;
 
 procedure TLogin.FormResize(Sender: TObject);
@@ -119,8 +110,6 @@ begin
   spacing := 15;
   fieldHeight := 40;
   centerX := ClientWidth div 2;
-  CheckBox1.Font.Color:= clWhite;
-  CheckBox1.Font.Style := [fsBold];  // pogrubienie
 
   // Styl etykiet
   LoginLabel.Font.Color := clWhite;
@@ -148,6 +137,16 @@ begin
   LoginButton.SetBounds(centerX - 150, Password.Top + fieldHeight + spacing * 2, 140, fieldHeight);
   BackButton.SetBounds(centerX + 10, LoginButton.Top, 140, fieldHeight);
 
+  CheckBox1.ParentFont := False;
+  CheckBox1.Font.Color := clWhite;
+  CheckBox1.Font.Style := [fsBold];
+  CheckBox1.Left := BackButton.Left;
+  CheckBox1.Top := BackButton.Top + BackButton.Height + spacing;
+  CheckBox1.Width:= BackButton.Width;
+  CheckBox1.Font.Size:= 12;
+
+
+
 end;
 
 function TLogin.SendServerCommand(const Cmd: string): string;
@@ -157,6 +156,13 @@ begin
   // bez kodowania
   UserSession.IdTCPClient1.IOHandler.WriteLn(Cmd);
     Result := UserSession.IdTCPClient1.IOHandler.ReadLn('', 500);
+end;
+
+
+
+function TLogin.HashPassword(const Password: string): string;
+begin
+  Result := THashSHA2.GetHashString(Password);
 end;
 
 
@@ -211,6 +217,7 @@ var
   enteredLogin, enteredPassword, hashedPassword: string;
 
 begin
+
   enteredLogin := Trim(Login.Text);
   enteredPassword := Trim(Password.Text);
   hashedPassword := HashPassword(enteredPassword);
@@ -223,6 +230,7 @@ begin
 
   query := TFDQuery.Create(nil);
   try
+
     query.Connection := FDConnection1; // podmieñ na swoj¹ nazwê po³¹czenia
     query.SQL.Text := 'SELECT userid, login FROM users WHERE login = :login AND pass = :password';
     query.ParamByName('login').AsString := enteredLogin;
@@ -258,6 +266,7 @@ begin
   finally
     query.Free;
   end;
+
 end;
 
 

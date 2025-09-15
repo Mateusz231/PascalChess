@@ -12,7 +12,6 @@ object Login: TLogin
   Font.Style = []
   OnClose = FormClose
   OnCreate = FormCreate
-  OnKeyPress = FormKeyPress
   OnResize = FormResize
   TextHeight = 15
   object Image1: TImage
@@ -1291,9 +1290,11 @@ object Login: TLogin
   object CheckBox1: TCheckBox
     Left = 552
     Top = 304
-    Width = 97
+    Width = 177
     Height = 17
     Caption = 'Show password'
+    Color = clWhite
+    ParentColor = False
     TabOrder = 4
     OnClick = CheckBox1Click
   end
@@ -1307,6 +1308,7 @@ object Login: TLogin
       'Database=pascalchess'
       'User_Name=root'
       'DriverID=MySQL')
+    LoginPrompt = False
     Left = 800
     Top = 344
   end

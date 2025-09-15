@@ -80,6 +80,7 @@ object LeaderboardForm: TLeaderboardForm
       'Database=pascalchess'
       'User_Name=root'
       'DriverID=MySQL')
+    LoginPrompt = False
     Left = 880
     Top = 392
   end

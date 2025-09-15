@@ -10,7 +10,7 @@ uses
   FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf, FireDAC.DApt.Intf,
   FireDAC.Stan.Async, FireDAC.DApt, Data.DB, FireDAC.Comp.DataSet,
   FireDAC.Comp.Client, FireDAC.UI.Intf, FireDAC.Stan.Def, FireDAC.Stan.Pool,
-  FireDAC.Phys, FireDAC.Phys.MySQL, FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait, System.Generics.Collections, System.Math, DateUtils;
+  FireDAC.Phys, FireDAC.Phys.MySQL, FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait, System.Generics.Collections, System.Math, DateUtils, UCIEngine;
 
 // Typy figur
 type
@@ -53,7 +53,6 @@ type
     BoardState: array[0..7,0..7] of TPiece;
     promotionSelection: Integer;
     SelectedSrc: TPoint;
-    IsMyTurn: Boolean;
     MyColor: string;
     OpponentName: string;
     OppId: Integer;
@@ -78,7 +77,9 @@ type
     lstMoves: TListBox;
     MovesList: TStringList;
     InGame: Boolean;
-
+    Uci: TUciEngine;
+    IsMyTurn: Boolean;
+    FMoveHistory: string;
 
 
     WhiteSeconds: Integer;
@@ -137,9 +138,12 @@ type
     function CanReach(const From, To2: TPoint; Piece: TPiece): Boolean;
     function CodeToPiece(const promoCode: string): TPiece;
     function SanHelper(Promotion: TPiece): string;
+    function UciToCoords(const Move: string; out sr, sc, tr, tc: Integer): Boolean;
+    function ExtractBestMove(const Output: string): string;
 
 
   public
+
 
   procedure SetGameType(gType: Integer);
 
@@ -192,16 +196,59 @@ end;
 
 procedure TChess.FormShow(Sender: TObject);
 begin
-  LoginName := UserSession.LoggedUserLogin;
 
+
+  if GameType = 4  then
+  begin
+
+  UCI := TUciEngine.Create(ExtractFilePath(Application.ExeName) + 'stockfish.exe');
+  Uci.SendCommand('uci');
+  Uci.SendCommand('isready');
+  Uci.SendCommand('ucinewgame');
+
+  Randomize;
+
+  if Random(2) = 0 then
+  begin
+  MyColor:='WHITE';
+  end
+
+  else
+
+  begin
+  MyColor:='BLACK';
+  ;
+  end;
+
+  LoginName := UserSession.LoggedUserLogin;
+  OppLogin.Caption:= 'Stockfish';
+  Application.Title:='Chess';
+  CreateBoard;
+  CurrentTurn:= 'WHITE';
+  IsMyTurn:=true;
+
+  if Mycolor='BLACK' then
+
+  begin
+
+    RotateBoardForBlack;
+  end;
+
+
+  end
+
+
+
+
+
+  else
+  begin
+  LoginName := UserSession.LoggedUserLogin;
   Application.Title:='Chess';
 
-
-
-     if not UserSession.IdTCPClient1.Connected then
+    if not UserSession.IdTCPClient1.Connected then
     begin
     ShowMessage('Błąd połączenia z serwerem.');
-   // FreeMemory;
     Self.Close;
     Exit;
     end;
@@ -221,23 +268,31 @@ begin
      CreateBoard;
      UpdateClockLabelsPosition;
 
- tmrWhite.Interval := 1000;
- tmrWhite.Enabled  := False;
- tmrBlack.Interval := 1000;
- tmrBlack.Enabled  := False;
- CurrentTurn:= 'WHITE';
+     tmrWhite.Interval := 1000;
+     tmrWhite.Enabled  := False;
+     tmrBlack.Interval := 1000;
+     tmrBlack.Enabled  := False;
+     CurrentTurn:= 'WHITE';
+     UpdateClockLabels;
+
+     Timer1.Enabled := True;
+     Timer1.Interval := 200;
+
+  end;
 
 
-  UpdateClockLabels;
 
-  Timer1.Enabled := True;
-  Timer1.Interval := 200;
+
 end;
 
 
 procedure TChess.FormCreate(Sender: TObject);
 begin
+if not GameType = 4 then
+begin
 FDPhysMySQLDriverLink1.VendorLib := ExtractFilePath(Application.ExeName) + 'libmysql.dll';
+end;
+
 end;
 
 procedure TChess.FormDestroy(Sender: TObject);
@@ -273,6 +328,51 @@ var
   i, j: Integer;
   chatHeight: Integer;
 begin
+
+
+  if GameType = 4 then
+  begin
+
+  avail := Min(ClientWidth, ClientHeight);
+  boardSize := (avail * ScalePercent) div 100;
+  cellSize  := boardSize div 8;
+  boardSize := cellSize * 8;
+  boardLeft := 60;
+  boardTop  := (ClientHeight - boardSize) div 2;
+  Panel.SetBounds(boardLeft, boardTop, boardSize, boardSize);
+
+  for i := 0 to 7 do
+    for j := 0 to 7 do
+      BoardPanels[i,j].SetBounds(j*cellSize, i*cellSize, cellSize, cellSize);
+
+
+
+       if MyColor = 'BLACK' then
+  begin
+    for i := 0 to 7 do
+      for j := 0 to 7 do
+        // nowe położenie: zamieniamy i<->j i lustrujemy indeksy 7-i,7-j
+        BoardPanels[i,j].SetBounds(
+          (7-j)*cellSize,
+          (7-i)*cellSize,
+          cellSize, cellSize
+        );
+  end;
+
+  movesLeft   := Panel.Left + Panel.Width + SideMargin;
+  movesTop    := Panel.Top;
+  movesWidth  := 200;  // stała szerokość listy ruchów
+  movesHeight := Panel.Height * MovesPct div 100;
+  lstMoves.SetBounds(movesLeft, movesTop, movesWidth, movesHeight);
+
+    SetupCoordinatesLeftAndBottom;
+    UpdateYourLabelsPosition;
+    UpdateOpponentLabelsPosition;
+  end
+  else
+  begin
+
+
   // 1) Ile mamy miejsca – bierzemy mniejszy wymiar okna
   avail := Min(ClientWidth, ClientHeight);
 
@@ -343,6 +443,11 @@ begin
   UpdateYourLabelsPosition;
 
 
+
+  end;
+
+
+
 end;
 
 
@@ -386,6 +491,17 @@ begin
       OriginalPos[i,j]    := Point(j*cellSize, i*cellSize);
     end;
 
+  if GameType = 4 then
+  begin
+  YourLogin.Caption := UserSession.LoggedUserLogin;
+  CreateMovesList;
+  UpdateYourLabelsPosition;
+  SetupCoordinatesLeftAndBottom;
+  InitializeState;
+
+  end
+  else
+  begin
 
   YourLogin.Caption := UserSession.LoggedUserLogin;
   YourRanking.Caption := FindRankingSQL(UserSession.LoggedUserID, GameType);
@@ -394,13 +510,53 @@ begin
   CreateChatControls;
   UpdateYourLabelsPosition;
   SetupCoordinatesLeftAndBottom;
-
-  // 5) Reszta inicjalizacji
   InitializeState;
+
+  end;
+
+
 end;
 
 
+function TChess.ExtractBestMove(const Output: string): string;
+var
+  Lines: TArray<string>;
+  Line: string;
+  Parts: TArray<string>;
+begin
+  Result := '';
+  Lines := Output.Split([sLineBreak], TStringSplitOptions.ExcludeEmpty);
+  for Line in Lines do
+  begin
+    if Line.StartsWith('bestmove') then
+    begin
+      Parts := Line.Split([' '], TStringSplitOptions.ExcludeEmpty);
+      if Length(Parts) >= 2 then
+        Exit(Parts[1]); // np. "e2e4"
+    end;
+  end;
+end;
 
+
+function TChess.UciToCoords(const Move: string; out sr, sc, tr, tc: Integer): Boolean;
+begin
+  Result := False;
+  if Length(Move) < 4 then Exit;
+
+  try
+    // źródło
+    sc := Ord(Move[1]) - Ord('a');       // kolumna 'a'..'h' → 0..7
+    sr := 8 - StrToIntDef(Move[2], 0);   // wiersz '1'..'8' → 7..0
+
+    // cel
+    tc := Ord(Move[3]) - Ord('a');
+    tr := 8 - StrToIntDef(Move[4], 0);
+
+    Result := True;
+  except
+    Result := False;
+  end;
+end;
 
 
 function TChess.FindRankingSQL(userid: Integer; gtype: Integer): string;
@@ -504,6 +660,9 @@ end;
 
 procedure TChess.InitializeState;
 var i, j: Integer;
+  output, move: string;
+  parts: TArray<string>;
+  sr, sc, tr, tc: Integer;
 begin
 
     HasWhiteKingMoved:= false;
@@ -543,6 +702,47 @@ begin
   IsMyTurn := False;
   Resize;
 
+  if GameType = 4 then
+  begin
+
+  If MyColor='BLACK' then
+  begin
+
+
+
+  // 1. Aktualizuj pozycję (np. przechowuj historię ruchów w FMoveHistory)
+  Uci.SendCommand('position startpos moves ' + FMoveHistory);
+
+  // 2. Poproś o najlepszy ruch
+  Uci.SendCommand('go depth 12');
+
+  // 3. Odbierz wynik
+  repeat
+    output := Uci.ReadOutput;
+  until output.Contains('bestmove');
+
+  // 4. Parsuj "bestmove e2e4"
+
+  var move2 := ExtractBestMove(output);
+
+
+  if (move2 <> '') and UciToCoords(move2, sr, sc, tr, tc) then
+  begin
+  ApplyMove(sr, sc, tr, tc, ptNone);
+  FMoveHistory := FMoveHistory + ' ' + move2;
+  IsMyTurn:=True;
+  end
+
+
+
+
+  end;
+
+
+
+
+  end;
+
 
 end;
 
@@ -557,6 +757,8 @@ var
   wasCapture: Boolean;
 
 begin
+
+
   if not IsMyTurn then Exit;
 
   square := Sender as TPanel;
@@ -575,6 +777,8 @@ begin
     row := vRow;
     col := vCol;
   end;
+
+
 
   // Teraz zamiast BoardState[vRow,vCol] robimy BoardState[row,col]:
   if (SelectedSrc.X < 0) and OwnsPiece(BoardState[row,col]) then
@@ -598,7 +802,6 @@ begin
       wasCapture := BoardState[dstRow, dstCol] <> ptNone;
       var  p := BoardState[srcRow, srcCol];      // ← zapamiętujemy przed apply
 
-
       san := MoveToSAN(
       p,
       Point(srcCol, srcRow),
@@ -621,11 +824,7 @@ begin
       else
         promo := ptNone;
 
-
-
-
       san:= san+SanHelper(promo);
-     // SanHelper(promo);
 
 
 
@@ -636,12 +835,52 @@ begin
       SendMove( Format('%d,%d->%d,%d',[srcRow,srcCol,dstRow,dstCol]) );
 
 
+    if GameType = 4 then
+    begin
+      IsMyTurn := False;
+
+       // 1. Zamień ruch człowieka na UCI
+     var srcUci := Chr(Ord('a') + srcCol) + IntToStr(8 - srcRow);
+     var dstUci := Chr(Ord('a') + dstCol) + IntToStr(8 - dstRow);
+     var moveUci := srcUci + dstUci;
+     var sr,sc,tr,tc: Integer;
+
+      // 2. Dodaj do historii
+      if FMoveHistory <> '' then
+        FMoveHistory := FMoveHistory + ' ' + moveUci
+      else
+        FMoveHistory := moveUci;
+
+      // 3. Zaktualizuj pozycję w Stockfish
+      Uci.SendCommand('position startpos moves ' + FMoveHistory);
+      Uci.SendCommand('go depth 12');
+
+      // 4. Poczekaj na odpowiedź
+      var output: string;
+      repeat
+        output := Uci.ReadOutput;
+      until output.Contains('bestmove');
+
+      // 5. Parsuj odpowiedź
+      var parts := ExtractBestMove(output);
+      if (Length(parts) >= 2) and UciToCoords(parts, sr, sc, tr, tc) then
+      begin
+        ApplyMove(sr, sc, tr, tc, ptNone);
+        FMoveHistory := FMoveHistory + ' ' + parts;
+        IsMyTurn := True; // teraz znów kolej człowieka
+      end;
 
 
-      UpdateClockLabels;
+    end
+    else
+
+
+    begin
+
+    UpdateClockLabels;
     Elapsed := SecondsBetween(Now, TurnStartTime);
     if UserSession.IdTCPClient1.Connected then
-      UserSession.IdTCPClient1.IOHandler.WriteLn('TIME:' + IntToStr(Elapsed));
+    UserSession.IdTCPClient1.IOHandler.WriteLn('TIME:' + IntToStr(Elapsed));
 
 
 
@@ -650,17 +889,26 @@ begin
     tmrBlack.Enabled := False;
 
 
+       if PromotionFlag then
+        begin
+         SendMove('PROMO:'+ PromotionChar);
+         PromotionChar:='';
+         PromotionFlag:= false;
+        end;
+
+        IsMyTurn := False;
 
 
 
-    if PromotionFlag then
-    begin
-    SendMove('PROMO:'+ PromotionChar);
-    PromotionChar:='';
-    PromotionFlag:= false;
+
     end;
 
-      IsMyTurn := False;
+
+
+
+
+
+
     end;
 
     // odznaczamy panel źródłowy:
@@ -679,6 +927,20 @@ begin
     LastDst := Point(dstCol, dstRow);
     UpdateBoardColors;
   end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 end;
 
 function TChess.PieceToChar(P: TPiece): string;
@@ -758,6 +1020,7 @@ begin
           parts := payload.Split(['-', '>', ','], TStringSplitOptions.ExcludeEmpty);
           if Length(parts) = 4 then
             try
+
               sr := StrToInt(parts[0]); sc := StrToInt(parts[1]);
               tr := StrToInt(parts[2]); tc := StrToInt(parts[3]);
               ApplyMove(sr, sc, tr, tc, ptNone);
@@ -769,19 +1032,6 @@ begin
               IsMyTurn := True;
               TurnStartTime := Now;
               UpdateTimers;
-
-              if Lost then
-              begin
-              ShowMessage('You lost by checkmate!');
-              DisableBoard;
-              tmrWhite.Enabled := False;
-              tmrBlack.Enabled := False;
-              InGame:= False;
-              end;
-
-
-
-
 
 
             except on E: EConvertError do
@@ -812,8 +1062,16 @@ begin
         end
         else if FollowUp.StartsWith('ENDGAME:') then
         begin
+
           var mess := FollowUp.Substring(8);
-          if mess = 'LOSE' then Lost := True
+          if mess = 'LOSE' then
+          begin
+          ShowMessage('You lost by checkmate!');
+          DisableBoard;
+          tmrWhite.Enabled := False;
+          tmrBlack.Enabled := False;
+          InGame:= False;
+          end
           else if mess = 'WIN' then Win := True
           else if mess = 'DRAW' then Draw := True;
         end
@@ -850,18 +1108,6 @@ begin
         IsMyTurn := True;
         TurnStartTime := Now;
         UpdateTimers;
-
-          if Lost then
-        begin
-         ShowMessage('You lost by checkmate!');
-         DisableBoard;
-         tmrWhite.Enabled := False;
-         tmrBlack.Enabled := False;
-         InGame:= false;
-        end;
-
-
-
 
 
       except on E: EConvertError do
@@ -933,8 +1179,23 @@ begin
 
   else if Msg.StartsWith('ENDGAME:') then
   begin
-    var mess := Msg.Substring(8);
-    if mess = 'LOSE' then Lost := True;
+
+  var mess := Msg.Substring(8);
+  ShowMessage(mess);
+  if mess = 'LOSE' then
+  begin
+
+  ShowMessage('You lost by checkmate!');
+  DisableBoard;
+  tmrWhite.Enabled := False;
+  tmrBlack.Enabled := False;
+  InGame:= False;
+
+  end
+
+
+  else if mess = 'WIN' then Win := True
+  else if mess = 'DRAW' then Draw := True;
   end
 
 
@@ -1727,6 +1988,13 @@ begin
   tmrWhite.Enabled := False;
   tmrBlack.Enabled := False;
 
+
+  if Win or LOST or DRAW then
+  begin
+  EXIT;
+  end;
+
+
   if IsMyTurn then
   begin
     // jeśli teraz ja mam ruch, włączam swój zegar
@@ -1982,7 +2250,25 @@ const
   OffsetY = 5;
   SpacingX = 20;
 begin
-  // OppLogin/OppRanking nad planszą
+
+
+  if GameType = 4  then
+  begin
+
+  OppLogin.Top    := Panel.Top - OppLogin.Height - OffsetY;
+  OppLogin.Left   := Panel.Left;
+  OppLogin.Font.Size:= 18;
+  OppLogin.BringToFront;
+
+
+  end
+
+
+
+  else
+  begin
+
+    // OppLogin/OppRanking nad planszą
   OppLogin.Top    := Panel.Top - OppLogin.Height - OffsetY;
   OppLogin.Left   := Panel.Left;
   OppRanking.Top  := OppLogin.Top;
@@ -1993,6 +2279,11 @@ begin
 
   OppLogin.BringToFront;
   OppRanking.BringToFront;
+
+
+  end;
+
+
 end;
 
 
@@ -2003,7 +2294,21 @@ const
 var
   coordRowHeight: Integer;
 begin
-  // Obliczamy wysokość rzędu z literami (koordynatami)
+
+  if GameType = 4  then
+  begin
+  YourLogin.Font.Size   := 18;   // proporcjonalne
+  YourLogin.Top  := Panel.Top + Panel.Height + coordRowHeight + LowerLabelsOffset;
+  YourLogin.Left := Panel.Left;
+  YourLogin.BringToFront;
+
+  end
+
+
+
+  else
+  begin
+    // Obliczamy wysokość rzędu z literami (koordynatami)
   coordRowHeight := (Panel.Width div 8) div 4;
   // bo w SetupCoordinates robiliśmy: cellSize div 4 dla wysokości liter
 
@@ -2018,6 +2323,9 @@ begin
 
   YourLogin.BringToFront;
   YourRanking.BringToFront;
+  end;
+
+
 end;
 
 

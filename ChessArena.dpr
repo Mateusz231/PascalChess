@@ -11,7 +11,8 @@ uses
   RankingsLeaderboard in 'RankingsLeaderboard.pas' {Form8},
   MatchHistory in 'MatchHistory.pas' {Form9},
   GameTypeMenu in 'GameTypeMenu.pas' {Form11},
-  UCIEngine in 'UCIEngine.pas';
+  UCIEngine in 'UCIEngine.pas',
+  Unit3 in 'Unit3.pas' {Form3};
 
 {$R *.res}
 
@@ -19,12 +20,5 @@ begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
   Application.CreateForm(TMainMenu, MainMenu);
-  Application.CreateForm(TChess, Chess);
-  Application.CreateForm(TRegisterMenu, RegisterMenu);
-  Application.CreateForm(TLogin, Login);
-  Application.CreateForm(TProfile, Profile);
-  Application.CreateForm(TLeaderboardForm, LeaderboardForm);
-  Application.CreateForm(TMatchHistoryForm, MatchHistoryForm);
-  Application.CreateForm(TGameType, GameType);
   Application.Run;
 end.

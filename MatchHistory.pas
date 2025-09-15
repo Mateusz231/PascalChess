@@ -55,6 +55,7 @@ Uses UserSession;
 procedure TMatchHistoryForm.FormCreate(Sender: TObject);
 Begin
  FDPhysMySQLDriverLink1.VendorLib := ExtractFilePath(Application.ExeName) + 'libmysql.dll';
+ FDConnection1.Connected := False;
   Color := clBlack;
   Font.Color := clWhite;
   Font.Size := 10;

@@ -1288,5 +1288,6 @@ object GameType: TGameType
     Cursor = crHandPoint
     Caption = 'AI'
     TabOrder = 4
+    OnClick = Button4Click
   end
 end

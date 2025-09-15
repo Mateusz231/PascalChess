@@ -26,6 +26,7 @@ type
     procedure FormShow(Sender: TObject);
     procedure FormResize(Sender: TObject);
     procedure InviteClick(Sender: TObject);
+    procedure Button4Click(Sender: TObject);
 
   private
   ActivePlayers: TDictionary<string, boolean>;
@@ -43,7 +44,7 @@ implementation
 
 {$R *.dfm}
 
-uses ChessGame, Main, UserSession;
+uses ChessGame, Main, UserSession, Unit3;
 
 procedure TGameType.Button1Click(Sender: TObject);
 begin
@@ -117,6 +118,21 @@ end;
 
 
 
+
+procedure TGameType.Button4Click(Sender: TObject);
+begin
+
+ Self.Hide;
+
+  Chess := TChess.Create(nil);
+
+  Chess.SetGameType(4);
+
+  Chess.OnClose := ChessCloseHandler;
+
+  Chess.Show;
+
+end;
 
 procedure TGameType.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
@@ -291,7 +307,7 @@ begin
   if not Assigned(UserSession.IdTCPClient1)
     or not UserSession.IdTCPClient1.Connected then
   begin
-    ShowMessage('Brak po³¹czenia z serwerem.');
+    //ShowMessage('Brak po³¹czenia z serwerem.');
     Exit;
   end;
 
