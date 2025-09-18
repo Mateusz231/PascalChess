@@ -12,8 +12,9 @@ type
     FStdInWrite: THandle;
     FStdOutRead: THandle;
     procedure StartProcess(const ExeName: string);
-    procedure StopProcess;
+
   public
+    procedure StopProcess;
     constructor Create(const ExeName: string);
     destructor Destroy; override;
     procedure SendCommand(const Cmd: string);

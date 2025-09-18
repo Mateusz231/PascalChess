@@ -32,6 +32,7 @@ type
   ActivePlayers: TDictionary<string, boolean>;
   procedure ChessCloseHandler(Sender: TObject; var Action: TCloseAction);
   function SelectGameMode(out Mode: Integer): Boolean;
+  function ShowDifficultyDialog: Integer;
 
   public
   procedure RefreshPlayerList;
@@ -119,14 +120,21 @@ end;
 
 
 
+
 procedure TGameType.Button4Click(Sender: TObject);
 begin
 
+var difficulty: Integer;
+
  Self.Hide;
+
+  difficulty := ShowDifficultyDialog;
 
   Chess := TChess.Create(nil);
 
   Chess.SetGameType(4);
+
+  Chess.SetAILevel(difficulty);
 
   Chess.OnClose := ChessCloseHandler;
 
@@ -256,6 +264,64 @@ begin
   end;
 end;
 
+
+function TGameType.ShowDifficultyDialog: Integer;
+const
+  Labels: array[0..3] of string = (
+    'Easy (1)',
+    'Medium (5)',
+    'Hard (10)',
+    'Master (20)'
+  );
+  Values: array[0..3] of Integer = (1, 5, 10, 20);
+var
+  dlg: TForm;
+  rg: TRadioGroup;
+  btnOk, btnCancel: TButton;
+  i: Integer;
+begin
+  Result := 5; // domyœlny poziom
+  dlg := TForm.Create(nil);
+  try
+    dlg.Caption := 'Wybierz poziom trudnoœci AI';
+    dlg.BorderStyle := bsDialog;
+    dlg.Position := poScreenCenter;
+    dlg.ClientWidth := 360;
+    dlg.ClientHeight := 180;
+
+    rg := TRadioGroup.Create(dlg);
+    rg.Parent := dlg;
+    rg.Left := 10;
+    rg.Top := 10;
+    rg.Width := dlg.ClientWidth - 20;
+    rg.Height := 100;
+    rg.Items.Clear;
+    for i := 0 to High(Labels) do
+      rg.Items.Add(Labels[i]);
+    rg.ItemIndex := 1; // domyœlnie "Œredni"
+
+    btnOk := TButton.Create(dlg);
+    btnOk.Parent := dlg;
+    btnOk.Caption := 'OK';
+    btnOk.ModalResult := mrOk;
+    btnOk.SetBounds(dlg.ClientWidth div 2 - 90, dlg.ClientHeight - 50, 80, 28);
+
+    btnCancel := TButton.Create(dlg);
+    btnCancel.Parent := dlg;
+    btnCancel.Caption := 'Anuluj';
+    btnCancel.ModalResult := mrCancel;
+    btnCancel.SetBounds(dlg.ClientWidth div 2 + 10, dlg.ClientHeight - 50, 80, 28);
+
+    if dlg.ShowModal = mrOk then
+    begin
+      i := rg.ItemIndex;
+      if (i >= 0) and (i <= High(Values)) then
+        Result := Values[i];
+    end;
+  finally
+    dlg.Free;
+  end;
+end;
 
 
 

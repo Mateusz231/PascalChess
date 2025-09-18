@@ -59,6 +59,9 @@ type
     SelectedPanel: TPanel;
     LastSrc, LastDst: TPoint;
     pnlChat: TPanel;
+    btnSavePGN: TButton;
+    btnDraw: TButton;
+    btnSaveResign: TButton;
     memChat: TMemo;
     edtChat: TEdit;
     btnSend: TButton;
@@ -80,6 +83,7 @@ type
     Uci: TUciEngine;
     IsMyTurn: Boolean;
     FMoveHistory: string;
+    AILevel: Integer;
 
 
     WhiteSeconds: Integer;
@@ -112,9 +116,10 @@ type
     procedure CreateChatControls;
     procedure btnSendClick(Sender: TObject);
     procedure edtChatKeyPress(Sender: TObject; var Key: Char);
-    procedure FreeMemory;
     procedure CreateMovesList;
+    procedure CreateButtons;
     procedure AddMoveToList(const Move: string);
+    procedure btnSavePGNClick(Sender: TObject);
 
 
 
@@ -140,13 +145,15 @@ type
     function SanHelper(Promotion: TPiece): string;
     function UciToCoords(const Move: string; out sr, sc, tr, tc: Integer): Boolean;
     function ExtractBestMove(const Output: string): string;
+    function InsufficientMaterial: Boolean;
+    function MoveListToPGN: string;
 
 
   public
 
 
   procedure SetGameType(gType: Integer);
-
+  procedure SetAILevel(AI: Integer);
   end;
 
 var
@@ -193,6 +200,11 @@ begin
   GameType:= gType;
 end;
 
+procedure TChess.SetAILevel(AI: Integer);
+begin
+AILevel:=AI;
+end;
+
 
 procedure TChess.FormShow(Sender: TObject);
 begin
@@ -204,6 +216,7 @@ begin
   UCI := TUciEngine.Create(ExtractFilePath(Application.ExeName) + 'stockfish.exe');
   Uci.SendCommand('uci');
   Uci.SendCommand('isready');
+  Uci.SendCommand('setoption name Skill Level value ' + IntToStr(AILevel));
   Uci.SendCommand('ucinewgame');
 
   Randomize;
@@ -219,6 +232,8 @@ begin
   MyColor:='BLACK';
   ;
   end;
+
+
 
   LoginName := UserSession.LoggedUserLogin;
   OppLogin.Caption:= 'Stockfish';
@@ -313,6 +328,9 @@ begin
   end;
 
 
+  Uci.StopProcess;
+
+
 end;
 
 procedure TChess.FormResize(Sender: TObject);
@@ -364,6 +382,11 @@ begin
   movesWidth  := 200;  // stała szerokość listy ruchów
   movesHeight := Panel.Height * MovesPct div 100;
   lstMoves.SetBounds(movesLeft, movesTop, movesWidth, movesHeight);
+
+
+      // tryb offline AI → pod listą ruchów
+    btnSavePGN.Left := lstMoves.Left;
+    btnSavePGN.Top := lstMoves.Top + lstMoves.Height + 10;
 
     SetupCoordinatesLeftAndBottom;
     UpdateYourLabelsPosition;
@@ -435,7 +458,8 @@ begin
 );
 
 
-  // 7) Etykiety współrzędnych po lewej i na dole
+      btnSavePGN.Left := edtChat.Left;
+      btnSavePGN.Top := edtChat.Top + edtChat.Height + 10;
 
   SetupCoordinatesLeftAndBottom;
   UpdateClockLabelsPosition;
@@ -495,6 +519,7 @@ begin
   begin
   YourLogin.Caption := UserSession.LoggedUserLogin;
   CreateMovesList;
+  CreateButtons;
   UpdateYourLabelsPosition;
   SetupCoordinatesLeftAndBottom;
   InitializeState;
@@ -509,6 +534,7 @@ begin
   CreateMovesList;
   CreateChatControls;
   UpdateYourLabelsPosition;
+  CreateButtons;
   SetupCoordinatesLeftAndBottom;
   InitializeState;
 
@@ -551,6 +577,66 @@ begin
     // cel
     tc := Ord(Move[3]) - Ord('a');
     tr := 8 - StrToIntDef(Move[4], 0);
+
+
+    if Length(Move) = 5 then
+    begin
+    PromotionFlag:=true;
+
+        if MyColor = 'BLACK' then
+
+        begin
+
+    case Move[5] of
+    'q': promotionChar := 'QW';
+    'r': promotionChar := 'RW';
+    'b': promotionChar := 'BW';
+    'n': promotionChar := 'KW';
+
+
+    end;
+
+        end
+
+       else
+       begin
+
+       case Move[5] of
+       'q': promotionChar := 'QB';
+       'r': promotionChar := 'RB';
+       'b': promotionChar := 'BB';
+       'n': promotionChar := 'KB';
+
+
+
+       end;
+
+
+
+
+       end;
+
+
+
+
+
+
+    end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     Result := True;
   except
@@ -663,6 +749,8 @@ var i, j: Integer;
   output, move: string;
   parts: TArray<string>;
   sr, sc, tr, tc: Integer;
+  San: String;
+  promo: Tpiece;
 begin
 
     HasWhiteKingMoved:= false;
@@ -728,7 +816,42 @@ begin
 
   if (move2 <> '') and UciToCoords(move2, sr, sc, tr, tc) then
   begin
+
+
+    var wasCapture := BoardState[tr, tc] <> ptNone;
+    var   p := BoardState[sr, sc];      // ← zapamiętujemy przed apply
+
+      san := MoveToSAN(
+      p,
+      Point(sc, sr),
+      Point(tc, tr),
+      wasCapture,
+      promo
+      );
+
+
+
   ApplyMove(sr, sc, tr, tc, ptNone);
+
+
+        if PromotionFlag then
+      begin
+        // PromotionChar ustawiasz gdzie indziej jako 'Q','N' itd.
+       promo := CodeToPiece(PromotionChar);
+
+        // (napisz własną funkcję mapującą)
+      end
+      else
+        promo := ptNone;
+
+      san:= san+SanHelper(promo);
+
+
+
+      AddMoveToList(san);
+
+
+
   FMoveHistory := FMoveHistory + ' ' + move2;
   IsMyTurn:=True;
   end
@@ -835,8 +958,23 @@ begin
       SendMove( Format('%d,%d->%d,%d',[srcRow,srcCol,dstRow,dstCol]) );
 
 
-    if GameType = 4 then
+    if (GameType = 4) then
     begin
+
+    var temppromo: string;
+
+      if PromotionFlag then
+        begin
+         temppromo:=PromotionChar;
+         PromotionChar:='';
+         PromotionFlag:= false;
+        end;
+
+
+      if Draw then EXIT;
+      if Win then EXIT;
+       
+
       IsMyTurn := False;
 
        // 1. Zamień ruch człowieka na UCI
@@ -845,6 +983,12 @@ begin
      var moveUci := srcUci + dstUci;
      var sr,sc,tr,tc: Integer;
 
+
+     if (temppromo = 'QW') or (temppromo ='QB') then moveUci:= moveUci+'q';
+     if (temppromo = 'RW') or (temppromo ='RB') then moveUci:= moveUci+'r';
+     if (temppromo = 'BW') or (temppromo ='BB') then moveUci:= moveUci+'b';
+     if (temppromo = 'KW') or (temppromo ='KB') then moveUci:= moveUci+'n';
+
       // 2. Dodaj do historii
       if FMoveHistory <> '' then
         FMoveHistory := FMoveHistory + ' ' + moveUci
@@ -852,8 +996,9 @@ begin
         FMoveHistory := moveUci;
 
       // 3. Zaktualizuj pozycję w Stockfish
+
       Uci.SendCommand('position startpos moves ' + FMoveHistory);
-      Uci.SendCommand('go depth 12');
+      Uci.SendCommand('go depth 2');
 
       // 4. Poczekaj na odpowiedź
       var output: string;
@@ -865,7 +1010,50 @@ begin
       var parts := ExtractBestMove(output);
       if (Length(parts) >= 2) and UciToCoords(parts, sr, sc, tr, tc) then
       begin
+
+         wasCapture := BoardState[tr, tc] <> ptNone;
+         p := BoardState[sr, sc];      // ← zapamiętujemy przed apply
+
+      san := MoveToSAN(
+      p,
+      Point(sc, sr),
+      Point(tc, tr),
+      wasCapture,
+      promo
+      );
+
         ApplyMove(sr, sc, tr, tc, ptNone);
+
+
+          if PromotionFlag then
+      begin
+        // PromotionChar ustawiasz gdzie indziej jako 'Q','N' itd.
+       promo := CodeToPiece(PromotionChar);
+      BoardState[tr, tc] := promo;
+      BoardPanels[tr, tc].Caption := PieceToChar(promo);
+      UpdateBoardColors;
+
+
+      end
+      else
+        promo := ptNone;
+
+
+
+
+
+
+      san:= san+SanHelper(promo);
+      AddMoveToList(san);
+
+      if PromotionFlag then
+        begin
+         PromotionChar:='';
+         PromotionFlag:= false;
+        end;
+
+
+        CheckEndgame;
         FMoveHistory := FMoveHistory + ' ' + parts;
         IsMyTurn := True; // teraz znów kolej człowieka
       end;
@@ -883,8 +1071,6 @@ begin
     UserSession.IdTCPClient1.IOHandler.WriteLn('TIME:' + IntToStr(Elapsed));
 
 
-
-    IsMyTurn := False;
     tmrWhite.Enabled := False;
     tmrBlack.Enabled := False;
 
@@ -897,7 +1083,6 @@ begin
         end;
 
         IsMyTurn := False;
-
 
 
 
@@ -1937,7 +2122,6 @@ begin
 
   if foundAny then
   begin
-  //  ShowMessage(buf);      // pokaż wszystkie “legalne” ruchy
     Result := True;
   end
   else
@@ -1949,12 +2133,65 @@ var
   opp: string;
   inCheck, anyMove: Boolean;
 begin
-  opp := OpponentColor;     // np. 'WHITE' lub 'BLACK'
+
+  if GameType = 4 then
+  begin
+
+  opp:= MyColor;
+  inCheck:= IsInCheck(opp);
+  anyMove:= HasAnyLegalMove(opp);
+
+
+  if InsufficientMaterial then
+  begin
+  ShowMessage('Remis – brak materiału do mata');
+  DisableBoard;
+  Draw := True;
+  BtnSavePGN.Visible:= true;
+  Exit;
+  end;
+
+
+
+  if inCheck and not anyMove then
+
+  begin
+  ShowMessage('Przegrałeś przez mata!');
+  Disableboard;
+  Lost:=true;
+  BtnSavePGN.Visible:= true;
+  Exit;
+  end;
+
+
+  if not inCheck and not anyMove then
+  begin
+  ShowMessage('Remis poprzez pata');
+  Draw:=True;
+  Disableboard;
+  BtnSavePGN.Visible:= true;
+  Exit;
+  end;
+
+
+  end;
+
+  opp := OpponentColor;
   inCheck := IsInCheck(opp);
   anyMove := HasAnyLegalMove(opp);
-  // debug:
- // ShowMessage(Format('DEBUG EndGame: opp=%s, inCheck=%s, anyMove=%s',
-   // [opp, BoolToStr(inCheck, True), BoolToStr(anyMove, True)]));
+
+
+  if InsufficientMaterial then
+  begin
+  SendMove('ENDGAME:DRAW');
+  ShowMessage('Remis – brak materiału do mata');
+  tmrWhite.Enabled := False;
+  tmrBlack.Enabled := False;
+  DisableBoard;
+  Draw := True;
+   BtnSavePGN.Visible:= true;
+  Exit;
+  end;
 
   if inCheck and not anyMove then
   begin
@@ -1962,7 +2199,9 @@ begin
     ShowMessage('Mat! przeciwnik nie ma ruchu.');
     tmrWhite.Enabled := False;
     tmrBlack.Enabled := False;
+    DisableBoard;
     Win:=true;
+     BtnSavePGN.Visible:= true;
     Exit;
   end;
 
@@ -1972,9 +2211,15 @@ begin
     ShowMessage('Pat!');
     tmrWhite.Enabled := False;
     tmrBlack.Enabled := False;
+    DisableBoard;
     Draw:=true;
+     BtnSavePGN.Visible:= true;
     Exit;
   end;
+
+
+
+
 end;
 
 
@@ -1984,7 +2229,6 @@ end;
 
 procedure TChess.UpdateTimers;
 begin
-  // najpierw wyłączamy oba
   tmrWhite.Enabled := False;
   tmrBlack.Enabled := False;
 
@@ -1997,7 +2241,6 @@ begin
 
   if IsMyTurn then
   begin
-    // jeśli teraz ja mam ruch, włączam swój zegar
     if MyColor = 'WHITE' then
       tmrWhite.Enabled := True
     else
@@ -2005,7 +2248,6 @@ begin
   end
   else
   begin
-    // jeśli nie moja tura, włączam zegar przeciwnika
     if MyColor = 'WHITE' then
       tmrBlack.Enabled := True
     else
@@ -2386,47 +2628,6 @@ begin
 end;
 
 
-
-
-
-procedure TChess.FreeMemory;
-begin
-Lost := False; Win := False; Draw := False;
-SelectedSrc := Point(-1,-1);
-SelectedPanel := nil;
-PromotionFlag := False; promotionChar := '';
-IsMyTurn := False;
-tmrWhite.Enabled := False;
-tmrBlack.Enabled := False;
-MyColor:='';
-OppLogin.Caption:='';
-OppRanking.Caption:='';
-
-
-
-
-if assigned(UserSession.IdTCPClient1) and UserSession.IdTCPClient1.Connected then
-begin
-UserSession.IdTCPClient1.IOHandler.InputBuffer.Clear;
-end;
-
-
-FreeAndNil(memChat);
-FreeAndNil(edtChat);
-FreeAndNil(btnSend);
-FreeAndNil(pnlChat);
-//FreeAndNil(lstMoves);
-//FreeAndNil(MovesList);
-
-
-
-end;
-
-
-
-
-
-
 procedure TChess.CreateMovesList;
 begin
   MovesList := TStringList.Create;
@@ -2439,6 +2640,37 @@ begin
 end;
 
 
+procedure TChess.CreateButtons;
+begin
+
+  btnSavePGN := TButton.Create(Self);
+  btnSavePGN.Parent := Self;
+  btnSavePGN.Caption := 'Save PGN';
+  btnSavePGN.Width := 120;
+  btnSavePGN.Height := 40;
+  btnSavePGN.Visible:= false;
+  btnSavePGN.OnClick := btnSavePGNClick;
+
+  if GameType = 4 then
+  begin
+    // tryb offline AI → pod listą ruchów
+    btnSavePGN.Left := LstMoves.Left;
+    btnSavePGN.Top := LstMoves.Top + LstMoves.Height + 10;
+  end
+  else
+  begin
+    // tryb online → pod chatem
+    btnSavePGN.Left := edtChat.Left;
+    btnSavePGN.Top := edtChat.Top + EdtChat.Height + 10;
+  end;
+
+
+
+
+
+
+
+end;
 
 
 procedure TChess.AddMoveToList(const Move: string);
@@ -2613,6 +2845,20 @@ begin
   else if isCheck then
     Result := Result + '+';
 
+  If (Gametype = 4) and not IsMyTurn then
+  begin
+  isCheck := IsInCheck(MyColor);
+  isMate := IsCheck and not HasAnyLegalMove(Mycolor);
+
+  if isMate then
+  Result := Result + '#'
+  else if isCheck then
+  Result := Result + '+';
+
+
+
+  end;
+
 
 
 end;
@@ -2639,6 +2885,147 @@ end;
 
 
 
+
+
+function TChess.InsufficientMaterial: Boolean;
+var
+  r, c: Integer;
+  piece: TPiece;
+  others: array of TPiece;
+begin
+  SetLength(others, 0);
+
+  for r := 0 to 7 do
+    for c := 0 to 7 do
+    begin
+      piece := BoardState[r, c];
+      if (piece <> ptNone) and (piece <> ptWKing) and (piece <> ptBKing) then
+      begin
+        SetLength(others, Length(others) + 1);
+        others[High(others)] := piece;
+      end;
+    end;
+
+  // brak innych figur niż króle
+  if Length(others) = 0 then
+    Exit(True);
+
+  // tylko jedna lekka figura
+  if (Length(others) = 1) and
+     (others[0] in [ptWBishop, ptBBishop, ptWKnight, ptBKnight]) then
+    Exit(True);
+
+  // TODO: opcjonalnie obsłuż przypadek goniec vs goniec na tym samym kolorze
+
+  Result := False;
+end;
+
+
+procedure TChess.btnSavePGNClick(Sender: TObject);
+var
+  SaveDlg: TSaveDialog;
+  PGNText: string;
+  PGNFile: TextFile;
+begin
+  SaveDlg := TSaveDialog.Create(Self);
+  try
+    SaveDlg.Title := 'Zapisz partię jako PGN';
+    SaveDlg.Filter := 'PGN files (*.pgn)|*.pgn|All files (*.*)|*.*';
+    SaveDlg.DefaultExt := 'pgn';
+
+    if SaveDlg.Execute then
+    begin
+      PGNText := MoveListToPGN; // ← generujesz PGN ze swojej listy ruchów
+
+      AssignFile(PGNFile, SaveDlg.FileName);
+      Rewrite(PGNFile);
+      Write(PGNFile, PGNText);
+      CloseFile(PGNFile);
+
+      ShowMessage('Partia zapisana do ' + SaveDlg.FileName);
+    end;
+  finally
+    SaveDlg.Free;
+  end;
+end;
+
+
+
+function TChess.MoveListToPGN: string;
+var
+  i: Integer;
+  ResultTag: string;
+begin
+  Result := '';
+
+  // Nagłówki PGN
+  Result := Result + '[Event "Chess Game"]' + sLineBreak;
+  Result := Result + '[Site "Local"]' + sLineBreak;
+  Result := Result + '[Date "' + FormatDateTime('yyyy.MM.dd', Now) + '"]' + sLineBreak;
+  Result := Result + '[Round "-"]' + sLineBreak;
+
+
+  if Gametype = 4 then
+  begin
+
+  if MyColor = 'WHITE' then
+  begin
+    Result := Result + '[White "' + UserSession.LoggedUserLogin + '"]' + sLineBreak;
+    Result := Result + '[Black "Stockfish"]' + sLineBreak;
+  end
+  else
+  begin
+    Result := Result + '[White "Stockfish"]' + sLineBreak;
+    Result := Result + '[Black "' + UserSession.LoggedUserLogin + '"]' + sLineBreak;
+  end;
+  end
+  else
+  begin
+
+   if MyColor = 'WHITE' then
+  begin
+    Result := Result + '[White "' + UserSession.LoggedUserLogin + '"]' + sLineBreak;
+    Result := Result + '[Black "' + OpponentName + '"]' + sLineBreak;
+  end
+  else
+  begin
+    Result := Result + '[White "' + OpponentName + '"]' + sLineBreak;
+    Result := Result + '[Black "' + UserSession.LoggedUserLogin + '"]' + sLineBreak;
+  end;
+
+
+
+
+
+
+  end;
+
+
+
+
+  // Wynik w tagu
+  if Win and (MyColor = 'WHITE') then
+    ResultTag := '1-0'
+  else if Win and (MyColor = 'BLACK') then
+    ResultTag := '0-1'
+  else if Draw then
+    ResultTag := '1/2-1/2';
+
+
+  Result := Result + '[Result "' + ResultTag + '"]' + sLineBreak + sLineBreak;
+
+  // Ruchy partii
+  for i := 0 to MovesList.Count - 1 do
+  begin
+    if i mod 2 = 0 then
+      Result := Result + IntToStr(i div 2 + 1) + '. ' + MovesList[i] + ' '
+    else
+      Result := Result + MovesList[i] + ' ';
+  end;
+
+  // Wynik na końcu
+  Result := Result + ResultTag;
+end;
 
 
 
