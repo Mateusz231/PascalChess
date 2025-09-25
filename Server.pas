@@ -11,7 +11,7 @@ uses
   FireDAC.DApt.Intf, FireDAC.Stan.Async, FireDAC.DApt, FireDAC.UI.Intf,
   FireDAC.Stan.Def, FireDAC.Stan.Pool, FireDAC.Phys, FireDAC.Phys.MySQL,
   FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait, Data.DB, FireDAC.Comp.Client,
-  FireDAC.Comp.DataSet, Vcl.Grids, System.Math;
+  FireDAC.Comp.DataSet, Vcl.Grids, System.Math, EncdDecd, System.Threading;
 
 type
   /// Informacje o graczu oczekującym na parę
@@ -29,6 +29,9 @@ type
     WhiteSeconds: Integer;
     BlackSeconds: Integer;
     IncrementSeconds: Integer;
+    WhiteRanking, BlackRanking: Integer;
+    GameTypeId: Byte;
+    Result: String;
   end;
 
   TForm10 = class(TForm)
@@ -54,6 +57,7 @@ type
     procedure TryPairBullet;
     function FindPairWithPlayer(Player: TIdContext): TPlayerPair;
     function IsPlayerPaired(Player: TIdContext): Boolean;
+    function FindPairIndex(Player: TIdContext): Integer;
     procedure BroadcastToOpponent(SenderClient: TIdContext; const Msg: string);
     procedure BroadcastPromotion(SenderClient: TIdContext; const Msg: string);
     procedure Log(const Msg: string);
@@ -64,6 +68,12 @@ type
     procedure OnPlayerLeft(AContext: TidContext);
     procedure IdTCPServer1Disconnect(AContexT: TIdContext);
     procedure QueueLeft(AContext: TIdContext);
+    procedure BroadcastDrawOffer(SenderClient: TIdContext);
+    procedure BroadcastCustom(SenderClient: TIdContext; const Msg: string);
+    procedure SendSQL(SenderClient: TIdContext; const SQL: string; OpString: string);
+    procedure HandleRanking(SenderClient: TIdContext; const Ranking: string);
+    procedure UpdateRanking(SenderClient: TIdContext; const Msg: string);
+    procedure SaveRankingToDB(const Pair: TPlayerPair);
 
 
 
@@ -282,6 +292,189 @@ end;
 
 
 
+procedure TForm10.SendSQL(SenderClient: TIdContext; const SQL: string; OpString: string);
+var
+Pair: TPlayerPair;
+begin
+
+Pair := FindPairWithPlayer(SenderClient);
+FDQuery1.Connection := FDConnection1;
+FDQuery1.SQL.Text := SQL;
+FDQuery1.ParamByName('result').AsString := Pair.Result;
+FDQuery1.ParamByName('blackid').AsInteger := Pair.BlackID;
+FDQuery1.ParamByName('whiteid').AsInteger := Pair.WhiteID;
+FDQuery1.ParamByName('pgn').AsString := OpString;
+FDQuery1.ExecSQL;
+
+end;
+
+procedure TForm10.SaveRankingToDB(const Pair: TPlayerPair);
+begin
+  // Zrób kopię rekordu, żeby anonimowa metoda miała własny snapshot
+  var LocalPair := Pair;
+
+  // Uruchamiamy zapis w tle — nie blokuje wątku klienta
+  TTask.Run(procedure
+  var
+    Conn: TFDConnection;
+    Q: TFDQuery;
+    addWin, addLose, addDraw: Integer;
+  begin
+    try
+      Conn := TFDConnection.Create(nil);
+      Q := nil;
+      try
+        // Skopiuj parametry połączenia z głównego FDConnection1
+        // (upewnij się, że FDConnection1 ma ustawione Params/DriverName poprawnie)
+        Conn.Params.Assign(FDConnection1.Params);
+        Conn.DriverName := FDConnection1.DriverName;
+        Conn.LoginPrompt := False;
+
+        // jeśli używasz FDPhysMySQLDriverLink1.VendorLib, to ścieżka jest już ustawiona w FormCreate
+        // podłącz się
+        try
+          Conn.Connected := True;
+        except
+          on E: Exception do
+          begin
+            Log('DB connect error in SaveRankingToDBAsync: ' + E.ClassName + ': ' + E.Message);
+            Exit; // nie można połączyć -> wyjście z taska
+          end;
+        end;
+
+        Q := TFDQuery.Create(nil);
+        Q.Connection := Conn;
+
+        // --- BIAŁY ---
+        addWin  := Ord(LocalPair.Result = 'WHITE');
+        addLose := Ord(LocalPair.Result = 'BLACK');
+        addDraw := Ord(LocalPair.Result = 'DRAW');
+
+        Q.SQL.Text :=
+          'UPDATE rankings SET ' +
+          'rating      = :newRating, ' +
+          'gamesplayed = gamesplayed + 1, ' +
+          'wins        = wins  + :addWin, ' +
+          'loses       = loses + :addLose, ' +
+          'draws       = draws + :addDraw ' +
+          'WHERE users_userid = :userID AND game_type_id = :gameType';
+
+        Q.ParamByName('newRating').AsInteger := LocalPair.WhiteRanking;
+        Q.ParamByName('addWin').AsInteger    := addWin;
+        Q.ParamByName('addLose').AsInteger   := addLose;
+        Q.ParamByName('addDraw').AsInteger   := addDraw;
+        Q.ParamByName('userID').AsInteger    := LocalPair.WhiteID;
+        Q.ParamByName('gameType').AsInteger  := LocalPair.GameTypeId;
+
+        try
+          Q.ExecSQL;
+        except
+          on E: Exception do
+          begin
+            Log('DB exec error (white) SaveRankingToDBAsync: ' + E.ClassName + ': ' + E.Message);
+            // nie przerywamy taska, spróbujemy drugiego update dalej
+          end;
+        end;
+
+        // --- CZARNY ---
+        addWin  := Ord(LocalPair.Result = 'BLACK');
+        addLose := Ord(LocalPair.Result = 'WHITE');
+        addDraw := Ord(LocalPair.Result = 'DRAW');
+
+        Q.ParamByName('newRating').AsInteger := LocalPair.BlackRanking;
+        Q.ParamByName('addWin').AsInteger    := addWin;
+        Q.ParamByName('addLose').AsInteger   := addLose;
+        Q.ParamByName('addDraw').AsInteger   := addDraw;
+        Q.ParamByName('userID').AsInteger    := LocalPair.BlackID;
+        Q.ParamByName('gameType').AsInteger  := LocalPair.GameTypeId;
+
+        try
+          Q.ExecSQL;
+        except
+          on E: Exception do
+            Log('DB exec error (black) SaveRankingToDBAsync: ' + E.ClassName + ': ' + E.Message);
+        end;
+
+        // jeśli chcesz, możesz tu jeszcze zapisać log / wynik
+        Log(Format('Saved ranking async: W:%d B:%d (userids %d/%d)',
+          [LocalPair.WhiteRanking, LocalPair.BlackRanking, LocalPair.WhiteID, LocalPair.BlackID]));
+      finally
+        Q.Free;
+        Conn.Free;
+      end;
+    except
+      on E: Exception do
+        Log('Unhandled exception in SaveRankingToDBAsync task: ' + E.ClassName + ': ' + E.Message);
+    end;
+  end);
+end;
+
+
+
+procedure TForm10.UpdateRanking(SenderClient: TIdContext; const Msg: string);
+var
+  idx       : Integer;
+  Pair      : TPlayerPair;
+  K         : Integer;
+  Ewhite,
+  Eblack,
+  Swhite,
+  Sblack    : Double;
+  NewWhite,
+  NewBlack  : Integer;
+begin
+  idx := FindPairIndex(SenderClient);
+  if idx = -1 then Exit;
+
+  ListLock.Acquire;
+  try
+    Pair := ActivePairs[idx];
+
+    // --- obliczenia Elo ---
+    K := 32; // współczynnik – można zmieniać wg potrzeb
+
+    // oczekiwane wyniki
+    Ewhite := 1 / (1 + Power(10, (Pair.BlackRanking - Pair.WhiteRanking) / 400));
+    Eblack := 1 / (1 + Power(10, (Pair.WhiteRanking - Pair.BlackRanking) / 400));
+
+    // faktyczny wynik
+    if Pair.Result = 'WHITE' then
+    begin
+      Swhite := 1.0;
+      Sblack := 0.0;
+    end
+    else if Pair.Result = 'BLACK' then
+    begin
+      Swhite := 0.0;
+      Sblack := 1.0;
+    end
+    else // 'DRAW'
+    begin
+      Swhite := 0.5;
+      Sblack := 0.5;
+    end;
+
+    // nowe rankingi
+    NewWhite := Round(Pair.WhiteRanking + K * (Swhite - Ewhite));
+    NewBlack := Round(Pair.BlackRanking + K * (Sblack - Eblack));
+
+    Pair.WhiteRanking := NewWhite;
+    Pair.BlackRanking := NewBlack;
+
+    // jeśli chcesz np. zwiększać licznik rozegranych partii,
+    // możesz tu dodać pola w Pair i je aktualizować.
+
+    // nadpisujemy zmodyfikowany rekord w liście
+    ActivePairs[idx] := Pair;
+  finally
+    ListLock.Release;
+  end;
+
+ SaveRankingToDB(Pair);
+
+end;
+
+
 
 
 
@@ -324,9 +517,12 @@ begin
     Pair.WhiteSeconds     := RapidTime;
     Pair.BlackSeconds     := RapidTime;
     Pair.IncrementSeconds := RapidIncrement;
-
+    Pair.BlackRanking:=0;
+    Pair.WhiteRanking:=0;
+    Pair.GameTypeId:=1;
 
     ActivePairs.Add(Pair);
+
 
     RefreshPlayerGrid;
 
@@ -346,6 +542,10 @@ begin
   Pair.BlackPlayer.Connection.IOHandler.WriteLn('COLOR:BLACK');
   Pair.BlackPlayer.Connection.IOHandler.WriteLn('OPPONENT:'+Pair.WhiteLogin);
   Pair.BlackPlayer.Connection.IOHandler.WriteLn('ID:'+Pair.WhiteID.ToString);
+
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('RANKING:');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('RANKING:');
+
 end;
 
 
@@ -392,6 +592,9 @@ begin
     Pair.IncrementSeconds := BlitzIncrement;
 
     RefreshPlayerGrid;
+    Pair.BlackRanking:=0;
+    Pair.WhiteRanking:=0;
+    Pair.GameTypeId:=2;
 
 
     ActivePairs.Add(Pair);
@@ -412,6 +615,8 @@ begin
   Pair.BlackPlayer.Connection.IOHandler.WriteLn('COLOR:BLACK');
   Pair.BlackPlayer.Connection.IOHandler.WriteLn('OPPONENT:'+Pair.WhiteLogin);
   Pair.BlackPlayer.Connection.IOHandler.WriteLn('ID:'+Pair.WhiteID.ToString);
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('RANKING:');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('RANKING:');
 end;
 
 
@@ -453,7 +658,9 @@ begin
     Pair.WhiteSeconds     := BulletTime;
     Pair.BlackSeconds     := BulletTime;
     Pair.IncrementSeconds := BulletIncrement;
-
+    Pair.BlackRanking:=0;
+    Pair.WhiteRanking:=0;
+    Pair.GameTypeId:=3;
 
     ActivePairs.Add(Pair);
 
@@ -473,6 +680,8 @@ begin
   Pair.BlackPlayer.Connection.IOHandler.WriteLn('COLOR:BLACK');
   Pair.BlackPlayer.Connection.IOHandler.WriteLn('OPPONENT:'+Pair.WhiteLogin);
   Pair.BlackPlayer.Connection.IOHandler.WriteLn('ID:'+Pair.WhiteID.ToString);
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('RANKING:');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('RANKING:');
 end;
 
 /// Sprawdza, czy dany kontekst jest w jakiejś aktywnej parze
@@ -509,6 +718,22 @@ begin
   Result.WhitePlayer := nil;
   Result.BlackPlayer := nil;
 end;
+
+
+function TForm10.FindPairIndex(Player: TIdContext): Integer;
+begin
+  ListLock.Acquire;
+  try
+    for Result := 0 to ActivePairs.Count - 1 do
+      if (ActivePairs[Result].WhitePlayer = Player) or
+         (ActivePairs[Result].BlackPlayer = Player) then
+        Exit;
+    Result := -1;
+  finally
+    ListLock.Release;
+  end;
+end;
+
 
 /// Wysyła ruch do przeciwnika, dodając prefix OPPONENT_MOVE:
 procedure TForm10.BroadcastToOpponent(SenderClient: TIdContext; const Msg: string);
@@ -593,50 +818,134 @@ begin
 end;
 
 
+procedure TForm10.BroadcastDrawOffer(SenderClient: TIdContext);
+begin
+var
+  Pair: TPlayerPair;
+begin
+  Pair := FindPairWithPlayer(SenderClient);
+  if (Pair.WhitePlayer = nil) or (Pair.BlackPlayer = nil) then Exit;
+
+  if SenderClient = Pair.WhitePlayer then
+    Pair.BlackPlayer.Connection.IOHandler.WriteLn('DRAW:OFFER')
+  else
+    Pair.WhitePlayer.Connection.IOHandler.WriteLn('DRAW:OFFER');
+
+  end;
 
 
+
+end;
+
+
+
+
+procedure TForm10.BroadcastCustom(SenderClient: TidContext; const Msg: string);
+begin
+var
+  Pair: TPlayerPair;
+begin
+  Pair := FindPairWithPlayer(SenderClient);
+  if (Pair.WhitePlayer = nil) or (Pair.BlackPlayer = nil) then Exit;
+
+  if SenderClient = Pair.WhitePlayer then
+    Pair.BlackPlayer.Connection.IOHandler.WriteLn(Msg)
+  else
+    Pair.WhitePlayer.Connection.IOHandler.WriteLn(Msg);
+
+  end;
+
+
+
+end;
 
 
 
 
 procedure TForm10.BroadcastEndgame(SenderClient: TIdContext; const Msg: string);
-
 var
+  idx : Integer;
   Pair: TPlayerPair;
 begin
-  Pair := FindPairWithPlayer(SenderClient);
-  if Pair.WhitePlayer = nil then Exit;
+  idx := FindPairIndex(SenderClient);  // funkcja zwraca indeks w ActivePairs
+  if idx = -1 then Exit;
 
-  if Msg='LOSE' then
+  ListLock.Acquire;
+  try
+    Pair := ActivePairs[idx];  // kopiujemy z listy
 
-  begin
+    if Msg = 'WIN' then
+    begin
+      if SenderClient = Pair.WhitePlayer then
+      begin
+        Pair.BlackPlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
+        Pair.BlackPlayer.Connection.IOHandler.WriteLn('PGN:');
+        Pair.Result := 'BLACK';
+      end
+      else
+      begin
+        Pair.WhitePlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
+        Pair.WhitePlayer.Connection.IOHandler.WriteLn('PGN:');
+        Pair.Result := 'WHITE';
+      end;
+    end
+    else if Msg = 'LOSE' then
+    begin
+      if SenderClient = Pair.WhitePlayer then
+      begin
+        Pair.WhitePlayer.Connection.IOHandler.WriteLn('PGN:');
+        Pair.BlackPlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
+        Pair.Result := 'WHITE';
+      end
+      else
+      begin
+        Pair.BlackPlayer.Connection.IOHandler.WriteLn('PGN:');
+        Pair.WhitePlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
+        Pair.Result := 'BLACK';
+      end;
+    end
+    else if Msg = 'DRAW' then
+    begin
+      Pair.BlackPlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
+      Pair.WhitePlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
+      Pair.WhitePlayer.Connection.IOHandler.WriteLn('PGN:');
+      Pair.Result := 'DRAW';
+    end;
 
-  if SenderClient = Pair.WhitePlayer then
-  begin
-   Pair.BlackPlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
-   ActivePlayers[Pair.BlackLogin]:=false;
-   ActivePlayers[Pair.WhiteLogin]:=false;
+    ActivePlayers[Pair.BlackLogin] := False;
+    ActivePlayers[Pair.WhiteLogin] := False;
 
-  end
-
-
-  else
-  begin
-   Log(Msg);
-   Pair.WhitePlayer.Connection.IOHandler.WriteLn('ENDGAME:' + Msg);
-   ActivePlayers[Pair.BlackLogin]:=false;
-   ActivePlayers[Pair.WhiteLogin]:=false;
+    ActivePairs[idx] := Pair;  // <- nadpisujemy zmodyfikowany rekord
+  finally
+    ListLock.Release;
   end;
-
-
-  end;
-
-
 
   RefreshPlayerGrid;
-
 end;
 
+
+
+
+procedure TForm10.HandleRanking(SenderClient: TIdContext; const Ranking: String);
+var
+  idx: Integer;
+  Pair: TPlayerPair;
+begin
+  idx := FindPairIndex(SenderClient);
+  if idx = -1 then Exit;
+
+  ListLock.Acquire;
+  try
+    Pair := ActivePairs[idx];  // kopiujemy
+    if SenderClient = Pair.WhitePlayer then
+      Pair.BlackRanking := StrToInt(Ranking)
+    else
+      Pair.WhiteRanking := StrToInt(Ranking);
+    ActivePairs[idx] := Pair;  // nadpisujemy całość
+  finally
+    ListLock.Release;
+  end;
+end;
 
 
 procedure TForm10.IdTCPServer1Execute(AContext: TIdContext);
@@ -804,7 +1113,6 @@ end;
   Exit;
   end;
 
-
   if Msg.StartsWith('LOGIN:') then
   begin
 
@@ -912,6 +1220,13 @@ end;
   Msg := Msg.Trim; // może mieć pozostałe spacje
   if Msg.StartsWith('PROMO:') then
     BroadcastPromotion(AContext, Msg.Substring(6))
+
+  else if Msg.StartsWith('RANKING:') then
+  begin
+  var temp2:= Msg.Substring(8);
+  HandleRanking(Acontext, temp2);
+  end
+
   else if Msg.StartsWith('ENDGAME:') then
 
   begin
@@ -947,6 +1262,35 @@ end;
   BroadcastSAN(AContext, Msg.Substring(4).Trim);
   Exit;
   end
+
+  else if Msg.StartsWith('DRAW:OFFER') then
+  begin
+  BroadcastDrawOffer(AContext);
+  EXIT;
+  end
+
+
+  else if Msg.StartsWith('DRAW:ACCEPT') then
+  begin
+  BroadcastCustom(AContext,'DRAW:ACCEPT');
+  BroadcastEndgame(Acontext,'DRAW');
+  end
+
+  else if Msg.StartsWith('DRAW:DECLINE') then
+  begin
+  BroadcastCustom(AContext,'DRAW:DECLINE');
+  end
+
+  else if Msg.StartsWith('PGN:') then
+  begin
+  temp:=Msg.Substring(4);
+  temp:=StringReplace(Msg.Substring(4), '\n', sLineBreak, [rfReplaceAll]);
+  SendSQL(AContext,   'INSERT INTO games (result, blackplayerid, whiteplayerid, date, pgn) '+
+  'VALUES (:result, :blackid, :whiteid, NOW(), :pgn)', temp);
+  UpdateRanking(AContext,'');
+  end
+
+
 
 
   else

@@ -41,6 +41,7 @@ object MatchHistoryForm: TMatchHistoryForm
     Height = 25
     Caption = 'Previous'
     TabOrder = 1
+    OnClick = BtnPrevPageClick
   end
   object BtnNextPage: TButton
     Left = 320
@@ -49,6 +50,7 @@ object MatchHistoryForm: TMatchHistoryForm
     Height = 25
     Caption = 'Next'
     TabOrder = 2
+    OnClick = BtnNextPageClick
   end
   object BackButton: TButton
     Left = 320

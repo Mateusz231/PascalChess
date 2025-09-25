@@ -38,7 +38,7 @@ object Form10: TForm10
     Bindings = <>
     DefaultPort = 0
     OnExecute = IdTCPServer1Execute
-    Left = 168
+    Left = 240
     Top = 32
   end
   object FDQuery1: TFDQuery
@@ -51,11 +51,11 @@ object Form10: TForm10
       'Database=pascalchess'
       'User_Name=root'
       'DriverID=MySQL')
-    Left = 88
-    Top = 32
+    Left = 232
+    Top = 96
   end
   object FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink
-    Left = 128
-    Top = 32
+    Left = 48
+    Top = 96
   end
 end

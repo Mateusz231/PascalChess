@@ -91,12 +91,13 @@ end;
 procedure TMatchHistoryForm.SetupGrid;
 begin
   tsgrid.RowCount := RecordsPerPage + 1;
-  tsgrid.ColCount := 4;
+  tsgrid.ColCount := 5;
 
   tsgrid.Cells[0, 0] := 'Lp.';
   tsgrid.Cells[1, 0] := 'Opponent';
   tsgrid.Cells[2, 0] := 'Result';
   tsgrid.Cells[3, 0] := 'Date';
+  tsgrid.Cells[4,0] := 'Analyze';
 end;
 
 procedure TMatchHistoryForm.LoadMatchHistory;
@@ -155,6 +156,8 @@ begin
     tsgrid.Cells[1, i] := FDQuery1.FieldByName('opponent_login').AsString;
     tsgrid.Cells[2, i] := FDQuery1.FieldByName('outcome').AsString;
     tsgrid.Cells[3, i] := FDQuery1.FieldByName('date').AsString;
+    tsgrid.Objects[4,i]:= TObject(FDQuery1.FieldByName('gameid').AsInteger);
+    tsgrid.Cells[4,i]:='Analyze';
     Inc(i);
     FDQuery1.Next;
   end;

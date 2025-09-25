@@ -10,7 +10,7 @@ uses
   FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf, FireDAC.DApt.Intf,
   FireDAC.Stan.Async, FireDAC.DApt, Data.DB, FireDAC.Comp.DataSet,
   FireDAC.Comp.Client, FireDAC.UI.Intf, FireDAC.Stan.Def, FireDAC.Stan.Pool,
-  FireDAC.Phys, FireDAC.Phys.MySQL, FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait, System.Generics.Collections, System.Math, DateUtils, UCIEngine;
+  FireDAC.Phys, FireDAC.Phys.MySQL, FireDAC.Phys.MySQLDef, FireDAC.VCLUI.Wait, System.Generics.Collections, System.Math, DateUtils, UCIEngine, EncdDecd;
 
 // Typy figur
 type
@@ -61,7 +61,7 @@ type
     pnlChat: TPanel;
     btnSavePGN: TButton;
     btnDraw: TButton;
-    btnSaveResign: TButton;
+    btnResign: TButton;
     memChat: TMemo;
     edtChat: TEdit;
     btnSend: TButton;
@@ -120,6 +120,8 @@ type
     procedure CreateButtons;
     procedure AddMoveToList(const Move: string);
     procedure btnSavePGNClick(Sender: TObject);
+    procedure btnResignClick(Sender: TObject);
+    procedure btnDrawClick(Sender: TObject);
 
 
 
@@ -327,8 +329,10 @@ begin
  // FreeMemory;
   end;
 
-
+  if GameType = 4 then
+  begin
   Uci.StopProcess;
+  end;
 
 
 end;
@@ -383,10 +387,15 @@ begin
   movesHeight := Panel.Height * MovesPct div 100;
   lstMoves.SetBounds(movesLeft, movesTop, movesWidth, movesHeight);
 
+  btnResign.Left := lstMoves.Left;
+  btnResign.Top := lstMoves.Top + lstMoves.Height + 10;
 
-      // tryb offline AI → pod listą ruchów
-    btnSavePGN.Left := lstMoves.Left;
-    btnSavePGN.Top := lstMoves.Top + lstMoves.Height + 10;
+
+  btnSavePGN.Left := btnResign.Left + btnResign.Width;
+  btnSavePGN.Top := btnResign.Top;
+
+
+
 
     SetupCoordinatesLeftAndBottom;
     UpdateYourLabelsPosition;
@@ -458,8 +467,15 @@ begin
 );
 
 
-      btnSavePGN.Left := edtChat.Left;
-      btnSavePGN.Top := edtChat.Top + edtChat.Height + 10;
+  btnResign.Left := LstMoves.Left;
+  btnResign.Top := LstMoves.Top + LstMoves.Height + 10;
+
+  btnDraw.Left := btnResign.Left + btnResign.Width + 10;
+  btnDraw.Top := btnResign.Top;
+
+  btnSavePGN.Left := btnDraw.Left + btnDraw.Width + 10;
+  btnSavePGN.Top := btnDraw.Top;
+
 
   SetupCoordinatesLeftAndBottom;
   UpdateClockLabelsPosition;
@@ -699,14 +715,22 @@ begin
     tmrBlack.Enabled := False;
     if MyColor = 'WHITE' then
     begin
-    //SendMove('ENDGAME:TIMEOUT');
+    SendMove('ENDGAME:LOSE');
     ShowMessage('You lost on time!');
+    Lost:=true;
+    BtnDraw.Visible:=false;
+    BtnResign.Visible:=false;
+    BtnSavePGN.Visible:=true;
+    InGame:=false;
     DisableBoard;
     end
     else
     begin
     ShowMessage('White lost on time, you win!');
     Win:=true;
+    BtnDraw.Visible:=false;
+    BtnResign.Visible:=false;
+    InGame:=false;
     DisableBoard;
     end;
 
@@ -726,13 +750,22 @@ begin
 
     if MyColor = 'BLACK' then
     begin
+    SendMove('ENDGAME:LOSE');
     ShowMessage('You lost on time!');
+    BtnDraw.Visible:=false;
+    BtnResign.Visible:=false;
+    BtnSavePGN.Visible:=true;
+    Lost:=true;
+    InGame:=false;
     DisableBoard;
     end
     else
     begin
     ShowMessage('Black lost on time, you win!');
     Win:=true;
+    BtnDraw.Visible:=false;
+    BtnResign.Visible:=false;
+    InGame:=false;
     DisableBoard;
     end;
 
@@ -1024,6 +1057,9 @@ begin
 
         ApplyMove(sr, sc, tr, tc, ptNone);
 
+        LastSrc := Point(sc, sr);
+        LastDst := Point(tc, tr);
+
 
           if PromotionFlag then
       begin
@@ -1084,7 +1120,8 @@ begin
 
         IsMyTurn := False;
 
-
+    LastSrc := Point(srcCol, srcRow);
+    LastDst := Point(dstCol, dstRow);
 
     end;
 
@@ -1108,8 +1145,6 @@ begin
 
     SelectedSrc := Point(-1,-1);
     SelectedPanel := nil;
-    LastSrc := Point(srcCol, srcRow);
-    LastDst := Point(dstCol, dstRow);
     UpdateBoardColors;
   end;
 
@@ -1251,14 +1286,42 @@ begin
           var mess := FollowUp.Substring(8);
           if mess = 'LOSE' then
           begin
-          ShowMessage('You lost by checkmate!');
+            Lost:=true;
+            ShowMessage('You lost by checkmate!');
+            DisableBoard;
+            tmrWhite.Enabled := False;
+            tmrBlack.Enabled := False;
+            BtnSavePGN.Visible:= true;
+            btnResign.Visible:=false;
+            btnDraw.Visible:=false;
+            InGame:= false;
+          end
+          else if mess = 'WIN' then
+          begin
+            Win:=true;
+            DisableBoard;
+            tmrWhite.Enabled := False;
+            tmrBlack.Enabled := False;
+            BtnSavePGN.Visible:= true;
+            btnResign.Visible:=false;
+            btnDraw.Visible:=false;
+            InGame:= false;
+          end
+
+
+          else if mess = 'DRAW' then
+          begin
+          Draw:=true;
           DisableBoard;
           tmrWhite.Enabled := False;
           tmrBlack.Enabled := False;
-          InGame:= False;
-          end
-          else if mess = 'WIN' then Win := True
-          else if mess = 'DRAW' then Draw := True;
+          BtnSavePGN.Visible:= true;
+          btnResign.Visible:=false;
+          btnDraw.Visible:=false;
+          InGame:= false;
+
+          end;
+
         end
         else if FollowUp.StartsWith('COLOR:') then
         begin
@@ -1267,9 +1330,57 @@ begin
         end
         else if FollowUp.StartsWith('OPPONENT:') then
           OpponentName := FollowUp.Substring(9)
-        // możesz dodać tu kolejne typy, których spodziewasz się w FollowUp
-        ;
+
+        else if FollowUp.StartsWith('DRAW:OFFER') then
+        begin
+
+         if MessageDlg('Przeciwnik proponuje remis. Przyjąć?',
+                mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+          begin
+            // zaakceptowano
+            SendMove('DRAW:ACCEPT');
+          end
+          else
+          begin
+            // odrzucono
+            SendMove('DRAW:DECLINE');
+          end;
+
+        end
+
+
+        else if FollowUp.StartsWith('DRAW:ACCEPT') then
+        begin
+        memChat.Lines.Add('Remis poprzez zgodę obu stron');
+        end
+
+        else if FollowUp.StartsWith('DRAW:DECLINE') then
+        begin
+        memChat.Lines.Add('Przeciwnik odrzucil propozycje remis');
+        BtnDraw.Visible:=true;
+        end
+
+
+       else if FollowUp.StartsWith('RANKING:') then
+       begin
+       var temp:= FindRankingSQL(OppId,GameType);
+       SendMove('RANKING:'+temp);
+       end
+
+
+       else if FollowUp.StartsWith('PGN:') then
+       begin
+       var s := StringReplace(MoveListToPGN, sLineBreak, '\n', [rfReplaceAll]);
+       SendMove('PGN:' + s);
+       end;
+
+
       end;
+
+
+
+
+
     end;
 
     Exit;
@@ -1307,6 +1418,8 @@ begin
   if Msg = 'START' then
   begin
    ShowMessage('Gra rozpoczęta!');
+   btnResign.Visible:=true;
+   btnDraw.Visible:=true;
    InGame:= True;
   end
 
@@ -1332,10 +1445,13 @@ begin
   else if Msg.StartsWith('OPPONENT_LEFT') then
   begin
   ShowMessage('Your opponent left, you win!');
-  SendMove('ENDGAME:WIN');
+  Win:=true;
   DisableBoard;
   tmrWhite.Enabled := False;
   tmrBlack.Enabled := False;
+  BtnSavePGN.Visible:= true;
+  btnResign.Visible:=false;
+  btnDraw.Visible:=false;
   InGame:= false;
   end
   else if Msg.StartsWith('OPPONENT_PROMO:') then
@@ -1366,27 +1482,53 @@ begin
   begin
 
   var mess := Msg.Substring(8);
-  ShowMessage(mess);
   if mess = 'LOSE' then
   begin
-
+  Lost:=true;
   ShowMessage('You lost by checkmate!');
   DisableBoard;
   tmrWhite.Enabled := False;
   tmrBlack.Enabled := False;
-  InGame:= False;
+  BtnSavePGN.Visible:= true;
+  btnResign.Visible:=false;
+  btnDraw.Visible:=false;
+  InGame:= false;
+  end
+
+
+  else if mess = 'WIN' then
+  begin
+  Win:=true;
+  DisableBoard;
+  tmrWhite.Enabled := False;
+  tmrBlack.Enabled := False;
+  BtnSavePGN.Visible:= true;
+  btnResign.Visible:=false;
+  btnDraw.Visible:=false;
+  InGame:= false;
 
   end
 
 
-  else if mess = 'WIN' then Win := True
-  else if mess = 'DRAW' then Draw := True;
+  else if mess = 'DRAW' then
+  begin
+  Draw:=true;
+  DisableBoard;
+  tmrWhite.Enabled := False;
+  tmrBlack.Enabled := False;
+  BtnSavePGN.Visible:= true;
+  btnResign.Visible:=false;
+  btnDraw.Visible:=false;
+  InGame:= false;
+
+
+  end;
+
   end
 
 
  else if Msg.StartsWith('CHAT:') then
 begin
-  // NIE rób już OpponentName + ':'
   memChat.Lines.Add(Msg.Substring(5).Trim);
   Exit;
 end
@@ -1397,8 +1539,50 @@ end
   // Msg = 'SAN:e4' albo 'SAN:Nf3' albo 'SAN:exd5' itd.
      AddMoveToList(Msg.Substring(4).Trim);
      Exit;
-   end;
+   end
 
+
+   else if Msg.StartsWith('DRAW:OFFER') then
+   begin
+
+    if MessageDlg('Przeciwnik proponuje remis. Przyjąć?',
+    mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+    begin
+    // zaakceptowano
+    SendMove('DRAW:ACCEPT');
+    end
+    else
+    begin
+    // odrzucono
+     SendMove('DRAW:DECLINE');
+    end;
+
+
+   end
+
+
+   else if Msg.StartsWith('DRAW:DECLINE') then
+   begin
+   memChat.Lines.Add('Przeciwnik odrzucil propozycje remis');
+   BtnDraw.Visible:=true;
+   end
+
+   else if Msg.StartsWith('DRAW:ACCEPT') then
+   begin
+   memChat.Lines.Add('Remis poprzez zgodę obu stron');
+   end
+
+   else if Msg.StartsWith('PGN:') then
+   begin
+   var s := StringReplace(MoveListToPGN, sLineBreak, '\n', [rfReplaceAll]);
+   SendMove('PGN:' + s);
+   end
+
+   else if Msg.StartsWith('RANKING:') then
+   begin
+   var temp:= FindRankingSQL(OppId,GameType);
+   SendMove('RANKING:'+temp);
+   end;
 
 
 
@@ -2190,6 +2374,8 @@ begin
   DisableBoard;
   Draw := True;
    BtnSavePGN.Visible:= true;
+   BtnDraw.Visible:=false;
+   BtnResign.Visible:=false;
   Exit;
   end;
 
@@ -2202,6 +2388,8 @@ begin
     DisableBoard;
     Win:=true;
      BtnSavePGN.Visible:= true;
+     BtnDraw.Visible:=false;
+     BtnResign.Visible:=false;
     Exit;
   end;
 
@@ -2213,7 +2401,9 @@ begin
     tmrBlack.Enabled := False;
     DisableBoard;
     Draw:=true;
-     BtnSavePGN.Visible:= true;
+    BtnSavePGN.Visible:= true;
+    BtnDraw.Visible:=false;
+    BtnResign.Visible:=false;
     Exit;
   end;
 
@@ -2646,22 +2836,53 @@ begin
   btnSavePGN := TButton.Create(Self);
   btnSavePGN.Parent := Self;
   btnSavePGN.Caption := 'Save PGN';
-  btnSavePGN.Width := 120;
-  btnSavePGN.Height := 40;
+  btnSavePGN.Width := 80;
+  btnSavePGN.Height := 30;
   btnSavePGN.Visible:= false;
   btnSavePGN.OnClick := btnSavePGNClick;
 
+  btnResign := TButton.Create(Self);
+  btnResign.Parent := Self;
+  btnResign.Caption := 'Resign';
+  btnResign.Width := 80;
+  btnResign.Height := 30;
+  btnResign.onClick:= btnResignClick;
+  btnResign.Visible:= false;
+
+  btnDraw := TButton.Create(Self);
+  btnDraw.Parent := Self;
+  btnDraw.Caption := 'Draw';
+  btnDraw.Width := 80;
+  btnDraw.Height := 30;
+  btnDraw.Visible:= false;
+  btnDraw.OnClick:= btnDrawClick;
+
+
   if GameType = 4 then
   begin
-    // tryb offline AI → pod listą ruchów
-    btnSavePGN.Left := LstMoves.Left;
-    btnSavePGN.Top := LstMoves.Top + LstMoves.Height + 10;
+
+  btnResign.Left := lstMoves.Left;
+  btnResign.Top := lstMoves.Top + lstMoves.Height + 10;
+
+
+  btnSavePGN.Left := btnResign.Left + btnResign.Width;
+  btnSavePGN.Top := btnResign.Top;
   end
   else
   begin
-    // tryb online → pod chatem
-    btnSavePGN.Left := edtChat.Left;
-    btnSavePGN.Top := edtChat.Top + EdtChat.Height + 10;
+
+
+  btnResign.Left := edtChat.Left;
+  btnResign.Top := edtChat.Top + edtChat.Height + 10;
+
+
+  btnDraw.Left := btnResign.Left + btnResign.Width + 10;
+  btnDraw.Top := btnResign.Top;
+
+
+  btnSavePGN.Left := btnDraw.Left + btnDraw.Width + 10;
+  btnSavePGN.Top := btnDraw.Top;
+
   end;
 
 
@@ -3026,6 +3247,29 @@ begin
   // Wynik na końcu
   Result := Result + ResultTag;
 end;
+
+
+procedure TChess.btnResignClick(Sender: TObject);
+begin
+SendMove('ENDGAME:LOSE');
+DisableBoard;
+tmrWhite.Enabled := False;
+tmrBlack.Enabled := False;
+InGame:=false;
+btnSavePGN.Visible:=true;
+btnResign.Visible:=false;
+btnDraw.Visible:=false;
+end;
+
+
+
+procedure TChess.btnDrawClick(Sender: TObject);
+begin
+SendMove('DRAW:OFFER');
+BtnDraw.Visible:=false;
+end;
+
+
 
 
 
