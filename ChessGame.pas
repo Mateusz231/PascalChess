@@ -84,7 +84,7 @@ type
     IsMyTurn: Boolean;
     FMoveHistory: string;
     AILevel: Integer;
-
+    Invited: Boolean;
 
     WhiteSeconds: Integer;
     BlackSeconds: Integer;
@@ -152,9 +152,8 @@ type
 
 
   public
-
-
   procedure SetGameType(gType: Integer);
+  procedure SetInvited(Invite: Boolean);
   procedure SetAILevel(AI: Integer);
   end;
 
@@ -200,6 +199,11 @@ const
 procedure TChess.SetGameType(gType: Integer);
 begin
   GameType:= gType;
+end;
+
+procedure TChess.SetInvited(Invite: Boolean);
+begin
+Invited:=Invite;
 end;
 
 procedure TChess.SetAILevel(AI: Integer);
@@ -270,16 +274,21 @@ begin
     Exit;
     end;
 
+
+    if not Invited then
+    begin
     UserSession.IdTCPClient1.IOHandler.WriteLn('LOGIN:' + LoginName);
     UserSession.IdTCPClient1.IOHandler.WriteLn('ID:' + IntToStr(UserSession.LoggedUserID));
     UserSession.IdTCPClient1.IOHandler.WriteLn('MODE:'+IntToStr(GameType));
+    end;
+
 
     // Debug – poczekaj na odpowiedź serwera
-    while not UserSession.IdTCPClient1.IOHandler.InputBufferIsEmpty do
-    begin
-      var msg := Trim(UserSession.IdTCPClient1.IOHandler.ReadLn);
-      ShowMessage('Odpowiedź od serwera: ' + msg);
-    end;
+  // while not UserSession.IdTCPClient1.IOHandler.InputBufferIsEmpty do
+  // begin
+  //   var msg := Trim(UserSession.IdTCPClient1.IOHandler.ReadLn);
+    //  ShowMessage('Odpowiedź od serwera: ' + msg);
+ //  end;
 
 
      CreateBoard;
@@ -293,7 +302,7 @@ begin
      UpdateClockLabels;
 
      Timer1.Enabled := True;
-     Timer1.Interval := 200;
+     Timer1.Interval := 150;
 
   end;
 
@@ -1331,6 +1340,7 @@ begin
         else if FollowUp.StartsWith('OPPONENT:') then
           OpponentName := FollowUp.Substring(9)
 
+
         else if FollowUp.StartsWith('DRAW:OFFER') then
         begin
 
@@ -1417,7 +1427,7 @@ begin
   // 6) Pozostałe komunikaty
   if Msg = 'START' then
   begin
-   ShowMessage('Gra rozpoczęta!');
+  // ShowMessage('Gra rozpoczęta!');
    btnResign.Visible:=true;
    btnDraw.Visible:=true;
    InGame:= True;
@@ -1437,7 +1447,10 @@ begin
   else if Msg.StartsWith('ID:') then
   begin
   OppId := StrToInt(Msg.Substring(3));
-  OppRanking.Caption:= FindRankingSQL(OppId,GameType);
+  memChat.Lines.Add('NEW GAME');
+  var ts:=FindRankingSQL(OppId, GameType);
+  memChat.Lines.Add(OpponentName+' ('+ts+')' + ' - ' + YourLogin.Caption + '('+YourRanking.Caption+')');
+  OppRanking.Caption:=ts;
   UpdateOpponentLabelsPosition;
 
   end

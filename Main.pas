@@ -58,8 +58,6 @@ Self.Hide;
 if not Assigned(GameType) then
 GameType := TGameType.Create(nil);
 
-
-GameType.RefreshPlayerList;
 GameType.Show;
 end;
 

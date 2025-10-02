@@ -20,8 +20,8 @@ type
     FDQuery1: TFDQuery;
     FDConnection1: TFDConnection;
     FDPhysMySQLDriverLink1: TFDPhysMySQLDriverLink;
-    tsgrid: TStringGrid;
     BackButton: TButton;
+    tsgrid: TStringGrid;
 
     procedure FormCreate(Sender: TObject);
     procedure BtnPrevPageClick(Sender: TObject);
@@ -116,6 +116,7 @@ begin
     '  END AS opponent_login, ' +
     '  m.result, ' +
     '  m.date, ' +
+    '  m.gameid,'+
     '  CASE ' +
     '    WHEN :userid = m.whiteplayerid AND m.result = ''white'' THEN ''Win'' ' +
     '    WHEN :userid = m.blackplayerid AND m.result = ''black'' THEN ''Win'' ' +
@@ -211,47 +212,58 @@ begin
 end;
 
 procedure TMatchHistoryForm.FormResize(Sender: TObject);
+var
+  nonClient: Integer;
 begin
+  tsgrid.DefaultRowHeight := 28;
+  tsgrid.RowCount := RecordsPerPage + 1; // 15 danych + nagłówek
+
+  // oblicz non-client (ramki)
+  nonClient := tsgrid.Height - tsgrid.ClientHeight;
+  if nonClient < 0 then
+    nonClient := 0;
+
+  // ustaw dokładną wysokość: wszystkie wiersze * wysokość + ramka
+  tsgrid.Height := (tsgrid.RowCount * tsgrid.DefaultRowHeight) + nonClient;
+
+  // pozycjonowanie reszty
   tsgrid.Left := 20;
   tsgrid.Top := 50;
   tsgrid.Width := ClientWidth - 40;
-  tsgrid.DefaultRowHeight := 28;
-  tsgrid.RowCount := RecordsPerPage + 1;
-  tsgrid.Height := (RecordsPerPage + 1) * tsgrid.DefaultRowHeight;
-
 
   BtnPrevPage.Left := 20;
   BtnPrevPage.Top := tsgrid.Top + tsgrid.Height + 20;
-
   BtnNextPage.Left := BtnPrevPage.Left + BtnPrevPage.Width + 10;
   BtnNextPage.Top := BtnPrevPage.Top;
-
   BackButton.Top:= BtnNextPage.Top + BtnPrevPage.Height + 20;
   BackButton.Left:= 20;
-
   LblPageInfo.Left := ClientWidth - 120;
   LblPageInfo.Top := 20;
 
-  //ShowMessage('User ID: ' + IntToStr(UserSession.LoggedUserID));
+
+
+
   ResizeGridColumns;
 end;
 
 procedure TMatchHistoryForm.FormShow(Sender: TObject);
 begin
   LoadMatchHistory;
+  Resize;
 end;
 
 procedure TMatchHistoryForm.ResizeGridColumns;
 var
   TotalWidth: Integer;
 begin
-  if tsgrid.ColCount = 4 then
+  if tsgrid.ColCount = 5 then
   begin
     TotalWidth := tsgrid.ClientWidth;
     tsgrid.ColWidths[0] := TotalWidth div 10;           // Lp.
     tsgrid.ColWidths[1] := (TotalWidth * 4) div 10;     // Opponent
-    tsgrid.ColWidths[2] := (TotalWidth * 2) div 10;     // Result
-    tsgrid.ColWidths[3] := (TotalWidth * 3) div 10;     // Date
+    tsgrid.ColWidths[2] := (TotalWidth * 2) div 10;     // Result  s
+    tsgrid.ColWidths[3] := (TotalWidth * 2) div 10;
+    tsgrid.ColWidths[4] := (TotalWidth * 1) div 10;
   end;
 end;
 

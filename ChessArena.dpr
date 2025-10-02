@@ -11,8 +11,7 @@ uses
   RankingsLeaderboard in 'RankingsLeaderboard.pas' {Form8},
   MatchHistory in 'MatchHistory.pas' {Form9},
   GameTypeMenu in 'GameTypeMenu.pas' {Form11},
-  UCIEngine in 'UCIEngine.pas',
-  Unit3 in 'Unit3.pas' {Form3};
+  UCIEngine in 'UCIEngine.pas';
 
 {$R *.res}
 

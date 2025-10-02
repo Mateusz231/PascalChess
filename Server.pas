@@ -74,6 +74,10 @@ type
     procedure HandleRanking(SenderClient: TIdContext; const Ranking: string);
     procedure UpdateRanking(SenderClient: TIdContext; const Msg: string);
     procedure SaveRankingToDB(const Pair: TPlayerPair);
+    function FindContextByLogin(const Login: string): TIdContext;
+    function GetContextUserID(AContext: TIdContext): Integer;
+    procedure StartManualGame(InviterCtx, AccepterCtx: TIdContext;
+    GameTypeId, InviterID, AccepterID: Integer);
 
 
 
@@ -288,6 +292,9 @@ begin
     ListLock.Release;
   end;
 
+
+  RefreshPlayerGrid;
+
 end;
 
 
@@ -474,6 +481,116 @@ begin
 
 end;
 
+
+function TForm10.FindContextByLogin(const Login: string): TIdContext;
+var
+  ctx: TIdContext;
+begin
+  Result := nil;
+  for ctx in ContextToLogin.Keys do
+    if ContextToLogin[ctx] = Login then
+      Exit(ctx);
+end;
+
+
+function TForm10.GetContextUserID(AContext: TIdContext): Integer;
+var
+  i: Integer;
+begin
+  Result := 0;
+  ListLock.Acquire;
+  try
+    for i := 0 to WaitingRapid.Count - 1 do
+      if WaitingRapid[i].Context = AContext then
+        Exit(WaitingRapid[i].ID);
+    for i := 0 to WaitingBlitz.Count - 1 do
+      if WaitingBlitz[i].Context = AContext then
+        Exit(WaitingBlitz[i].ID);
+    for i := 0 to WaitingBullet.Count - 1 do
+      if WaitingBullet[i].Context = AContext then
+        Exit(WaitingBullet[i].ID);
+  finally
+    ListLock.Release;
+  end;
+end;
+
+
+ procedure TForm10.StartManualGame(InviterCtx, AccepterCtx: TIdContext;
+  GameTypeId, InviterID, AccepterID: Integer);
+var
+  Pair: TPlayerPair;
+  InviterLogin, AccepterLogin: string;
+begin
+  if (InviterCtx = nil) or (AccepterCtx = nil) then Exit;
+
+  // pobierz loginy
+  if not ContextToLogin.TryGetValue(InviterCtx, InviterLogin) then Exit;
+  if not ContextToLogin.TryGetValue(AccepterCtx, AccepterLogin) then Exit;
+
+  ListLock.Acquire;
+  try
+    QueueLeft(InviterCtx);
+    QueueLeft(AccepterCtx);
+
+    // losowo kolory
+    if Random(2) = 0 then
+    begin
+      Pair.WhitePlayer := InviterCtx;
+      Pair.WhiteLogin  := InviterLogin;
+      Pair.WhiteID     := InviterID;
+
+      Pair.BlackPlayer := AccepterCtx;
+      Pair.BlackLogin  := AccepterLogin;
+      Pair.BlackID     := AccepterID;
+    end
+    else
+    begin
+      Pair.WhitePlayer := AccepterCtx;
+      Pair.WhiteLogin  := AccepterLogin;
+      Pair.WhiteID     := AccepterID;
+
+      Pair.BlackPlayer := InviterCtx;
+      Pair.BlackLogin  := InviterLogin;
+      Pair.BlackID     := InviterID;
+    end;
+
+    // czasy wg trybu
+    case GameTypeId of
+      1: begin Pair.WhiteSeconds := RapidTime; Pair.BlackSeconds := RapidTime; Pair.IncrementSeconds := RapidIncrement; end;
+      2: begin Pair.WhiteSeconds := BlitzTime; Pair.BlackSeconds := BlitzTime; Pair.IncrementSeconds := BlitzIncrement; end;
+      3: begin Pair.WhiteSeconds := BulletTime; Pair.BlackSeconds := BulletTime; Pair.IncrementSeconds := BulletIncrement; end;
+    else
+      begin Pair.WhiteSeconds := RapidTime; Pair.BlackSeconds := RapidTime; Pair.IncrementSeconds := RapidIncrement; end;
+    end;
+
+    Pair.WhiteRanking := 0;
+    Pair.BlackRanking := 0;
+    Pair.GameTypeId   := GameTypeId;
+
+    ActivePlayers[Pair.WhiteLogin] := True;
+    ActivePlayers[Pair.BlackLogin] := True;
+
+    ActivePairs.Add(Pair);
+  finally
+    ListLock.Release;
+  end;
+
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('START');
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('COLOR:WHITE');
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('OPPONENT:'+Pair.BlackLogin);
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('ID:'+Pair.BlackID.ToString);
+
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('START');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('COLOR:BLACK');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('OPPONENT:'+Pair.WhiteLogin);
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('ID:'+Pair.WhiteID.ToString);
+
+  Pair.WhitePlayer.Connection.IOHandler.WriteLn('RANKING:');
+  Pair.BlackPlayer.Connection.IOHandler.WriteLn('RANKING:');
+
+  RefreshPlayerGrid;
+
+end;
 
 
 
@@ -1009,13 +1126,47 @@ begin
 
 
 
-      if Msg = 'GET_PLAYERS' then
+  if Msg.StartsWith('GET_PLAYERS') then
 begin
-  // Dla każdego wpisu w ActivePlayers wyślij osobną linię:
-  for var Login in ActivePlayers.Keys do
-  begin
+  var Parts := Msg.Split([':']);
+  var Offset := 0;
+  var Limit  := 10;
+  var Filter := '';
+  var Flag:='';
 
-    var Flag: string;
+  // Parsowanie parametrów
+  if Length(Parts) >= 3 then
+  begin
+    Offset := StrToIntDef(Parts[1], 0);
+    Limit  := StrToIntDef(Parts[2], 10);
+  end;
+  if Length(Parts) >= 4 then
+    Filter := LowerCase(Parts[3]);
+
+  var AllLogins := ActivePlayers.Keys.ToArray;
+  var CountSent := 0;
+  var Index     := 0;
+
+  // sortowanie – np. alfabetycznie
+  TArray.Sort<string>(AllLogins);
+
+  for var Login in AllLogins do
+  begin
+    // filtr nazwy
+    if (Filter <> '') and (Pos(Filter, LowerCase(Login)) = 0) then
+      Continue;
+
+    // pomiń do offsetu
+    if Index < Offset then
+    begin
+      Inc(Index);
+      Continue;
+    end;
+
+    // limit 10 rekordów
+    if CountSent >= Limit then
+      Break;
+
     if ActivePlayers[Login] then
     begin
     Flag:='1';
@@ -1025,39 +1176,122 @@ begin
     Flag:='0';
     end;
 
-
     AContext.Connection.IOHandler.WriteLn('PLAYER:' + Login + ':' + Flag);
+
+    Inc(CountSent);
+    Inc(Index);
   end;
+
+  // sygnał końca listy
   AContext.Connection.IOHandler.WriteLn('');
   Exit;
 end;
 
 
-    if Msg.StartsWith('INVITE:') then
+ if Msg.StartsWith('INVITE:') then
+begin
+  var Parts := Msg.Split([':']);
+  if Length(Parts) >= 5 then
   begin
-    var IsIdle: boolean;
-    var Target := Msg.Substring(7);
-    // czy ten gracz jest w słowniku i wolny?
-    if ActivePlayers.TryGetValue(Target, IsIdle) and IsIdle then
-    begin
-      // wyślij powiadomienie do zapraszanego
-      for var ctx in ContextToLogin.Keys do
-        if ContextToLogin[ctx] = Target then
-          ctx.Connection.IOHandler.WriteLn('INVITED_BY:' + ContextToLogin[AContext]);
+    var TargetLogin := Parts[1];
+    var Mode2       := StrToIntDef(Parts[2], 1);
+    var SourceLogin := Parts[3];
+    var SourceID    := StrToIntDef(Parts[4], 0);
 
-      // oznacz obu jako zajętych
-      ActivePlayers[ContextToLogin[AContext]] := False;
-      ActivePlayers[Target] := False;
+    ListLock.Acquire;
+    try
+      var TargetCtx := FindContextByLogin(TargetLogin);
+      var IsIdle: Boolean;
+      if (TargetCtx <> nil) and ActivePlayers.TryGetValue(TargetLogin, IsIdle) and (IsIdle = False) then
+      begin
+        // usuwamy z kolejek (żeby nie trafiło do auto-parowania)
+        QueueLeft(AContext);
+        QueueLeft(TargetCtx);
 
-      AContext.Connection.IOHandler.WriteLn('INVITE_SENT:' + Target);
-    end
-    else
-      AContext.Connection.IOHandler.WriteLn('INVITE_FAIL:' + Target);
+        // powiadom adresata (kto go zaprasza + tryb gry + ID)
+        TargetCtx.Connection.IOHandler.WriteLn(
+          'INVITED_BY:' + SourceLogin + ':' + IntToStr(Mode2) + ':' + IntToStr(SourceID)
+        );
+
+      end
+      else
+      begin
+
+      end;
+    finally
+      ListLock.Release;
+    end;
 
     RefreshPlayerGrid;
-    Exit;
   end;
+  Exit;
+end;
 
+
+if Msg.StartsWith('INVITE_ACCEPT:') then
+begin
+  var Parts := Msg.Split([':']);
+  if Length(Parts) >= 6 then
+  begin
+    var InviterLogin := Parts[1];
+    var InviterID    := StrToIntDef(Parts[2], 0);
+    var Mode2        := StrToIntDef(Parts[3], 1);
+    var AccepterLogin:= Parts[4];
+    var AccepterID   := StrToIntDef(Parts[5], 0);
+
+    var InviterCtx := FindContextByLogin(InviterLogin);
+    if Assigned(InviterCtx) then
+    begin
+      // powiadom zapraszającego, że zaakceptowano
+      InviterCtx.Connection.IOHandler.WriteLn(
+        'INVITE_ACCEPTED:' + AccepterLogin + ':' + IntToStr(Mode2)
+      );
+
+      AContext.Connection.IOHandler.WriteLn('INVITE_ACCEPTED:' + InviterLogin + ':' + IntToStr(Mode2));
+
+      // start gry: InviterCtx = zapraszający, AContext = akceptujący
+      StartManualGame(InviterCtx, AContext, Mode2, InviterID, AccepterID);
+    end
+    else
+    begin
+      AContext.Connection.IOHandler.WriteLn('INVITE_FAIL:' + InviterLogin);
+    end;
+  end;
+  Exit;
+end;
+
+
+if Msg.StartsWith('INVITE_DECLINE:') then
+begin
+  var Parts := Msg.Split([':']);
+  if Length(Parts) >= 2 then   // tylko nadawca jest potrzebny
+  begin
+    var SourceLogin := Parts[1];
+    var SourceCtx := FindContextByLogin(SourceLogin);
+    if Assigned(SourceCtx) then
+      SourceCtx.Connection.IOHandler.WriteLn(
+        'INVITE_DECLINED:' + ContextToLogin[AContext]);
+
+    // odblokuj obu graczy (wracają jako wolni)
+    ListLock.Acquire;
+    try
+      var declLogin := '';
+      if ContextToLogin.TryGetValue(AContext, declLogin) then
+        ActivePlayers[declLogin] := False;
+      if Assigned(SourceCtx) then
+      begin
+        var srcLogin := '';
+        if ContextToLogin.TryGetValue(SourceCtx, srcLogin) then
+          ActivePlayers[srcLogin] := False;
+      end;
+    finally
+      ListLock.Release;
+    end;
+
+    RefreshPlayerGrid;
+  end;
+  Exit;
+end;
 
 
 

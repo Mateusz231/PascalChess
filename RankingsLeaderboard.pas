@@ -31,6 +31,7 @@ type
     procedure GridLeaderboardDrawCell(Sender: TObject; ACol, ARow: Integer; Rect: TRect; State: TGridDrawState);
     procedure FormResize(Sender: TObject);
     procedure BackButtonClick(Sender: TObject);
+    procedure FormShow(Sender: TObject);
   private
     FPage: Integer;
     const
@@ -252,31 +253,56 @@ begin
 end;
 
 procedure TLeaderboardForm.FormResize(Sender: TObject);
+var
+  nonClient: Integer;
 begin
-  GridLeaderboard.Left := 20;
-  GridLeaderboard.Top := 50;
-  GridLeaderboard.Width := ClientWidth - 40;
+
   GridLeaderboard.DefaultRowHeight := 28;
   GridLeaderboard.RowCount := RecordsPerPage + 1;
-  GridLeaderboard.Height := (RecordsPerPage + 1) * GridLeaderboard.DefaultRowHeight;
+
+  // ró¿nica miêdzy Height a ClientHeight (ramka + nag³ówek)
+  nonClient := GridLeaderboard.Height - GridLeaderboard.ClientHeight;
+  if nonClient < 0 then
+    nonClient := 0;
+
+  // wysokoœæ = wszystkie wiersze + margines ramki
+  GridLeaderboard.Height :=
+    (GridLeaderboard.RowCount * GridLeaderboard.DefaultRowHeight) + nonClient;
+
+  GridLeaderboard.Left := 20;
+  GridLeaderboard.Top  := 50;
+  GridLeaderboard.Width := ClientWidth - 40;
 
   cboGameType.Left := 20;
-  cboGameType.Top := GridLeaderboard.Top + GridLeaderboard.Height + 20;
+  cboGameType.Top  := GridLeaderboard.Top + GridLeaderboard.Height + 20;
   cboGameType.Width := 150;
 
   BtnPrevPage.Left := 20;
-  BtnPrevPage.Top := cboGameType.Top + cboGameType.Height + 20;
+  BtnPrevPage.Top  := cboGameType.Top + cboGameType.Height + 20;
 
   BtnNextPage.Left := BtnPrevPage.Left + BtnPrevPage.Width + 10;
-  BtnNextPage.Top := BtnPrevPage.Top;
+  BtnNextPage.Top  := BtnPrevPage.Top;
 
-  BackButton.Top:= BtnNextPage.Top + BtnPrevPage.Height + 20;
-  BackButton.Left:= 20;
+  BackButton.Top  := BtnNextPage.Top + BtnPrevPage.Height + 20;
+  BackButton.Left := 20;
 
   LblPageInfo.Left := ClientWidth - 120;
-  LblPageInfo.Top := 20;
+  LblPageInfo.Top  := 20;
+
+  ShowMessage(Format(
+  'Height=%d  ClientHeight=%d  ró¿nica=%d',
+  [GridLeaderboard.Height,
+   GridLeaderboard.ClientHeight,
+   GridLeaderboard.Height - GridLeaderboard.ClientHeight]
+));
 
   ResizeGridColumns;
+end;
+
+
+procedure TLeaderboardForm.FormShow(Sender: TObject);
+begin
+Resize;
 end;
 
 procedure TLeaderboardForm.ResizeGridColumns;
@@ -288,8 +314,8 @@ begin
     TotalWidth := GridLeaderboard.ClientWidth;
 
     GridLeaderboard.ColWidths[0] := TotalWidth div 10;  // Lp.
-    GridLeaderboard.ColWidths[1] := (TotalWidth * 5) div 10; // Login
-    GridLeaderboard.ColWidths[2] := (TotalWidth * 2) div 10; // Country
+    GridLeaderboard.ColWidths[1] := (TotalWidth * 4) div 10; // Login
+    GridLeaderboard.ColWidths[2] := (TotalWidth * 3) div 10; // Country
     GridLeaderboard.ColWidths[3] := (TotalWidth * 2) div 10; // Rating
   end;
 end;

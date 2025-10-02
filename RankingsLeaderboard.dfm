@@ -2,7 +2,7 @@ object LeaderboardForm: TLeaderboardForm
   Left = 0
   Top = 0
   Caption = 'Leaderboard'
-  ClientHeight = 619
+  ClientHeight = 830
   ClientWidth = 1116
   Color = clBlack
   Font.Charset = DEFAULT_CHARSET
@@ -13,6 +13,7 @@ object LeaderboardForm: TLeaderboardForm
   OnClose = FormClose
   OnCreate = FormCreate
   OnResize = FormResize
+  OnShow = FormShow
   TextHeight = 13
   object LblPageInfo: TLabel
     Left = 86

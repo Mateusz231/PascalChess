@@ -22,25 +22,13 @@ object MatchHistoryForm: TMatchHistoryForm
     Height = 15
     Caption = 'LblPageInfo'
   end
-  object tsgrid: TStringGrid
-    Left = 168
-    Top = 120
-    Width = 320
-    Height = 120
-    Color = clWhite
-    ColCount = 4
-    DefaultColWidth = 120
-    FixedColor = clGray
-    RowCount = 16
-    TabOrder = 0
-  end
   object BtnPrevPage: TButton
     Left = 320
     Top = 480
     Width = 75
     Height = 25
     Caption = 'Previous'
-    TabOrder = 1
+    TabOrder = 0
     OnClick = BtnPrevPageClick
   end
   object BtnNextPage: TButton
@@ -49,7 +37,7 @@ object MatchHistoryForm: TMatchHistoryForm
     Width = 75
     Height = 25
     Caption = 'Next'
-    TabOrder = 2
+    TabOrder = 1
     OnClick = BtnNextPageClick
   end
   object BackButton: TButton
@@ -58,8 +46,15 @@ object MatchHistoryForm: TMatchHistoryForm
     Width = 75
     Height = 25
     Caption = 'Back'
-    TabOrder = 3
+    TabOrder = 2
     OnClick = BackButtonClick
+  end
+  object tsgrid: TStringGrid
+    Left = 416
+    Top = 200
+    Width = 320
+    Height = 120
+    TabOrder = 3
   end
   object FDQuery1: TFDQuery
     Left = 880

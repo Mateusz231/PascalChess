@@ -1290,4 +1290,10 @@ object GameType: TGameType
     TabOrder = 4
     OnClick = Button4Click
   end
+  object Timer1: TTimer
+    Interval = 200
+    OnTimer = Timer1Timer
+    Left = 856
+    Top = 312
+  end
 end
