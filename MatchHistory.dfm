@@ -55,6 +55,7 @@ object MatchHistoryForm: TMatchHistoryForm
     Width = 320
     Height = 120
     TabOrder = 3
+    OnClick = tsgridClick
   end
   object FDQuery1: TFDQuery
     Left = 880

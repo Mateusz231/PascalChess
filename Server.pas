@@ -78,6 +78,7 @@ type
     function GetContextUserID(AContext: TIdContext): Integer;
     procedure StartManualGame(InviterCtx, AccepterCtx: TIdContext;
     GameTypeId, InviterID, AccepterID: Integer);
+    procedure RemovePair(AContext: TIdContext);
 
 
 
@@ -269,6 +270,37 @@ begin
 
 
 end;
+
+procedure TForm10.RemovePair(AContext: TIdContext);
+var
+  i: Integer;
+  Pair: TPlayerPair;
+begin
+  ListLock.Acquire;
+  try
+    for i := ActivePairs.Count - 1 downto 0 do
+    begin
+      Pair := ActivePairs[i];
+
+      if (Pair.WhitePlayer = AContext) or (Pair.BlackPlayer = AContext) then
+      begin
+        // oznacz graczy jako wolnych
+        ActivePlayers[Pair.WhiteLogin] := False;
+        ActivePlayers[Pair.BlackLogin] := False;
+
+        // usuń parę z listy
+        ActivePairs.Delete(i);
+        Break;
+      end;
+    end;
+  finally
+    ListLock.Release;
+  end;
+
+  RefreshPlayerGrid;
+
+end;
+
 
 
 
@@ -1522,6 +1554,7 @@ end;
   SendSQL(AContext,   'INSERT INTO games (result, blackplayerid, whiteplayerid, date, pgn) '+
   'VALUES (:result, :blackid, :whiteid, NOW(), :pgn)', temp);
   UpdateRanking(AContext,'');
+  RemovePair(AContext);
   end
 
 

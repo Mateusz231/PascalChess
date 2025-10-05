@@ -13,6 +13,11 @@ uses
   FireDAC.VCLUI.Wait;
 
 type
+  TGameInfo = class
+  public GameId: Integer;
+  Opponent: string;
+  end;
+
   TMatchHistoryForm = class(TForm)
     BtnPrevPage: TButton;
     BtnNextPage: TButton;
@@ -31,6 +36,8 @@ type
     procedure BackButtonClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormShow(Sender: TObject);
+    procedure tsgridClick(Sender: TObject);
+    procedure ChessCloseHandler(Sender: TObject; var Action: TCloseAction);
   private
     FPage: Integer;
     const
@@ -50,7 +57,7 @@ implementation
 
 {$R *.dfm}
 
-Uses UserSession;
+Uses UserSession, ChessGame;
 
 procedure TMatchHistoryForm.FormCreate(Sender: TObject);
 Begin
@@ -67,7 +74,7 @@ Begin
   tsgrid.Color := clBlack;
   tsgrid.Font.Color := clWhite;
   tsgrid.FixedColor := clGray;
-  tsgrid.Options := tsgrid.Options + [goRowSelect];
+  tsgrid.Options := tsgrid.Options;
   tsgrid.DefaultRowHeight := 28;
   tsgrid.FixedRows := 1;
   tsgrid.OnDrawCell := tsgridDrawCell;
@@ -148,7 +155,16 @@ begin
 
   // Czyść stare dane
   for i := 1 to tsgrid.RowCount - 1 do
-    tsgrid.Rows[i].Clear;
+  begin
+
+  if Assigned(tsgrid.Objects[4, i]) then
+  begin
+    TGameInfo(tsgrid.Objects[4, i]).Free;
+    tsgrid.Objects[4, i] := nil;
+  end;
+  tsgrid.Rows[i].Clear;
+  end;
+
 
   i := 1;
   while not FDQuery1.Eof do
@@ -157,7 +173,11 @@ begin
     tsgrid.Cells[1, i] := FDQuery1.FieldByName('opponent_login').AsString;
     tsgrid.Cells[2, i] := FDQuery1.FieldByName('outcome').AsString;
     tsgrid.Cells[3, i] := FDQuery1.FieldByName('date').AsString;
-    tsgrid.Objects[4,i]:= TObject(FDQuery1.FieldByName('gameid').AsInteger);
+   // tsgrid.Objects[4,i]:= TObject(FDQuery1.FieldByName('gameid').AsInteger);
+    var GameInfo:=TGameInfo.Create;
+    GameInfo.GameId:= FdQuery1.FieldByName('gameid').AsInteger;
+    GameInfo.Opponent:= FDQuery1.FieldByName('opponent_login').AsString;
+    tsgrid.Objects[4,i]:=GameInfo;
     tsgrid.Cells[4,i]:='Analyze';
     Inc(i);
     FDQuery1.Next;
@@ -190,6 +210,51 @@ procedure TMatchHistoryForm.UpdatePageInfo;
 begin
   LblPageInfo.Caption := Format('Page: %d', [FPage + 1]);
 end;
+
+
+procedure TMatchHistoryForm.ChessCloseHandler(Sender: TObject; var Action: TCloseAction);
+begin
+  Action := caFree;
+  Application.MainForm.Show;
+end;
+
+
+
+procedure TMatchHistoryForm.tsgridClick(Sender: TObject);
+var
+  col, row: Integer;
+  GameInfo: TGameInfo;
+begin
+  col := tsgrid.Col;
+  row := tsgrid.Row;
+
+
+
+  if (row > 0) and (col = 4) then
+  begin
+    if Assigned(tsgrid.Objects[col, row]) then
+    begin
+      GameInfo := TGameInfo(tsgrid.Objects[col, row]);
+
+      // teraz masz oba
+     // ShowMessage(Format('GameID=%d, Opponent=%s',
+       // [GameInfo.GameID, GameInfo.Opponent]));
+
+
+        Self.Hide;
+        Chess := TChess.Create(nil);
+        Chess.SetGameType(5);
+        Chess.OnClose := ChessCloseHandler;
+        Chess.LoadGameFromDB(GameInfo.GameID, GameInfo.Opponent);
+        Chess.Show;
+
+
+    end;
+  end;
+end;
+
+
+
 
 procedure TMatchHistoryForm.tsgridDrawCell(Sender: TObject; ACol, ARow: Integer;
   Rect: TRect; State: TGridDrawState);

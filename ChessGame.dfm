@@ -12,6 +12,7 @@ object Chess: TChess
   Font.Style = []
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
   OnResize = FormResize
   OnShow = FormShow
   TextHeight = 15
