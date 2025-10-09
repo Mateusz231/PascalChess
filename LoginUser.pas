@@ -110,8 +110,6 @@ begin
   spacing := 15;
   fieldHeight := 40;
   centerX := ClientWidth div 2;
-
-  // Styl etykiet
   LoginLabel.Font.Color := clWhite;
   PasswordLabel.Font.Color := clWhite;
   LoginLabel.Font.Size := 14;
@@ -119,21 +117,14 @@ begin
   LoginLabel.Font.Style := [fsBold];
   PasswordLabel.Font.Style := [fsBold];
 
-  // Login Label
   LoginLabel.Left := (ClientWidth - LoginLabel.Width) div 2;
   LoginLabel.Top := 50;
-
-  // Login Edit
   Login.SetBounds(centerX - 150, LoginLabel.Top + LoginLabel.Height + spacing div 2, 300, fieldHeight);
 
-  // Password Label (nad polem has³a)
   PasswordLabel.Top := Login.Top + fieldHeight + spacing;
   PasswordLabel.Left := (ClientWidth - PasswordLabel.Width) div 2;
-
-  // Password Edit
   Password.SetBounds(centerX - 150, PasswordLabel.Top + PasswordLabel.Height + spacing div 2, 300, fieldHeight);
 
-  // Buttons
   LoginButton.SetBounds(centerX - 150, Password.Top + fieldHeight + spacing * 2, 140, fieldHeight);
   BackButton.SetBounds(centerX + 10, LoginButton.Top, 140, fieldHeight);
 
@@ -145,15 +136,12 @@ begin
   CheckBox1.Width:= BackButton.Width;
   CheckBox1.Font.Size:= 12;
 
-
-
 end;
 
 function TLogin.SendServerCommand(const Cmd: string): string;
 begin
   if not EnsureConnected then
     Exit('');
-  // bez kodowania
   UserSession.IdTCPClient1.IOHandler.WriteLn(Cmd);
     Result := UserSession.IdTCPClient1.IOHandler.ReadLn('', 500);
 end;
@@ -231,7 +219,7 @@ begin
   query := TFDQuery.Create(nil);
   try
 
-    query.Connection := FDConnection1; // podmieñ na swoj¹ nazwê po³¹czenia
+    query.Connection := FDConnection1;
     query.SQL.Text := 'SELECT userid, login FROM users WHERE login = :login AND pass = :password';
     query.ParamByName('login').AsString := enteredLogin;
     query.ParamByName('password').AsString := hashedPassword;
@@ -246,10 +234,7 @@ begin
         Exit;
         end;
 
-  // 3) dodaj na serwerze
-       ServerAddPlayer(enteredLogin);
-
-
+      ServerAddPlayer(enteredLogin);
       UserSession.LoggedUserLogin:= enteredLogin;
       UserSession.Logged:= true;
       UserSession.LoggedUserID:= query.FieldByName('userid').AsInteger;
@@ -257,7 +242,7 @@ begin
       ShowMessage('Zalogowano pomyœlnie!');
       MainMenu.ShowLogoutButton;
       Self.Hide;
-      Application.MainForm.Show; // lub cokolwiek chcesz pokazaæ
+      Application.MainForm.Show;
     end
     else
     begin

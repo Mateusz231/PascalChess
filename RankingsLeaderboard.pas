@@ -68,6 +68,7 @@ end;
 
 end;
 
+
 procedure TLeaderboardForm.FormCreate(Sender: TObject);
 begin
  FDPhysMySQLDriverLink1.VendorLib := ExtractFilePath(Application.ExeName) + 'libmysql.dll';
@@ -112,6 +113,7 @@ begin
   LoadLeaderboard;
 end;
 
+
 procedure TLeaderboardForm.SetupGrid;
 begin
   GridLeaderboard.RowCount := RecordsPerPage + 1;
@@ -121,9 +123,6 @@ begin
   GridLeaderboard.Cells[2, 0] := 'Country';
   GridLeaderboard.Cells[3, 0] := 'Rating';
 end;
-
-
-
 
 
 procedure TLeaderboardForm.LoadLeaderboard;
@@ -148,19 +147,17 @@ begin
   FDQuery1.ParamByName('offset').AsInteger := Offset;
   FDQuery1.Open;
 
-  // Jeœli nic nie znaleziono
   if FDQuery1.IsEmpty then
   begin
 
     if FPage > 0 then
     begin
       Dec(FPage);
-      LoadLeaderboard;  // spróbuj jeszcze raz
+      LoadLeaderboard;
     end;
     Exit;
   end;
 
-  // Wyczyœæ stare dane
   for i := 1 to GridLeaderboard.RowCount - 1 do
     GridLeaderboard.Rows[i].Clear;
 
@@ -178,22 +175,12 @@ begin
 
   UpdatePageInfo;
 end;
-
-
-
-
-
-
-
-
-
-
-
 procedure TLeaderboardForm.cboGameTypeChange(Sender: TObject);
 begin
   FPage := 0;
   LoadLeaderboard;
 end;
+
 
 procedure TLeaderboardForm.BtnPrevPageClick(Sender: TObject);
 begin
@@ -204,11 +191,13 @@ begin
   end;
 end;
 
+
 procedure TLeaderboardForm.BackButtonClick(Sender: TObject);
 begin
 Self.Hide;
 Application.MainForm.Show;
 end;
+
 
 procedure TLeaderboardForm.BtnNextPageClick(Sender: TObject);
 begin
@@ -221,6 +210,7 @@ begin
   LblPageInfo.Caption := Format('Page: %d', [FPage + 1]);
 end;
 
+
 function TLeaderboardForm.GetSelectedGameTypeID: Integer;
 begin
   case cboGameType.ItemIndex of
@@ -231,6 +221,7 @@ begin
     Result := 1;
   end;
 end;
+
 
 procedure TLeaderboardForm.GridLeaderboardDrawCell(Sender: TObject; ACol, ARow: Integer;
   Rect: TRect; State: TGridDrawState);
@@ -252,6 +243,7 @@ begin
   end;
 end;
 
+
 procedure TLeaderboardForm.FormResize(Sender: TObject);
 var
   nonClient: Integer;
@@ -260,12 +252,10 @@ begin
   GridLeaderboard.DefaultRowHeight := 28;
   GridLeaderboard.RowCount := RecordsPerPage + 1;
 
-  // ró¿nica miêdzy Height a ClientHeight (ramka + nag³ówek)
   nonClient := GridLeaderboard.Height - GridLeaderboard.ClientHeight;
   if nonClient < 0 then
     nonClient := 0;
 
-  // wysokoœæ = wszystkie wiersze + margines ramki
   GridLeaderboard.Height :=
     (GridLeaderboard.RowCount * GridLeaderboard.DefaultRowHeight) + nonClient;
 
@@ -304,6 +294,7 @@ procedure TLeaderboardForm.FormShow(Sender: TObject);
 begin
 Resize;
 end;
+
 
 procedure TLeaderboardForm.ResizeGridColumns;
 var

@@ -241,6 +241,7 @@ begin
   AnalysisTimer.OnTimer := AnalysisTimerTimer;
   AnalysisTimer.Enabled := True;
   CreateBoard;
+  Resize;
   end
 
 
@@ -310,15 +311,6 @@ begin
     UserSession.IdTCPClient1.IOHandler.WriteLn('MODE:'+IntToStr(GameType));
     end;
 
-
-    // Debug – poczekaj na odpowiedź serwera
-  // while not UserSession.IdTCPClient1.IOHandler.InputBufferIsEmpty do
-  // begin
-  //   var msg := Trim(UserSession.IdTCPClient1.IOHandler.ReadLn);
-    //  ShowMessage('Odpowiedź od serwera: ' + msg);
- //  end;
-
-
      CreateBoard;
      UpdateClockLabelsPosition;
 
@@ -358,13 +350,11 @@ begin
 
   SendMove('LEFT');
   SendMove('ENDGAME:LOSE');
-  //FreeMemory;
   end
 
   else
   begin
   SendMove('QUEUELEFT:'+UserSession.LoggedUserLogin);
- // FreeMemory;
   end;
 
   if GameType = 4 then
@@ -391,7 +381,7 @@ const
   ScalePercent = 80;   // plansza zajmie 80% szerokości/wysokości
   ChatHeightPercent = 20; // chat będzie miał 60% wysokości planszy
   ChatWidth         = 250; // szerokość w px
-    MovesPct       = 50;  // ruchy = 50% wysokości planszy
+  MovesPct       = 50;  // ruchy = 50% wysokości planszy
   SideMargin     = 10;
 var
   avail, boardSize, cellSize, boardLeft, boardTop: Integer;
@@ -432,13 +422,14 @@ begin
 
   movesLeft   := Panel.Left + Panel.Width + SideMargin;
   movesTop    := Panel.Top;
-  movesWidth  := 200;  // stała szerokość listy ruchów
+  movesWidth  := 200;
   movesHeight := Panel.Height * MovesPct div 100;
   lstMoves.SetBounds(movesLeft, movesTop, movesWidth, movesHeight);
 
       AnalysisGrid.Top := LstMoves.Top + LstMoves.Height + 8;
     AnalysisGrid.Left := LstMoves.Left;
-    AnalysisGrid.Width := LstMoves.Width;
+    AnalysisGrid.ColWidths[0] := 60;
+    AnalysisGrid.ColWidths[1] := AnalysisGrid.ClientWidth - 80;
     SetupCoordinatesLeftAndBottom;
     UpdateYourLabelsPosition;
     UpdateOpponentLabelsPosition;
@@ -469,7 +460,6 @@ begin
     begin
     for i := 0 to 7 do
       for j := 0 to 7 do
-        // nowe położenie: zamieniamy i<->j i lustrujemy indeksy 7-i,7-j
         BoardPanels[i,j].SetBounds(
           (7-j)*cellSize,
           (7-i)*cellSize,
@@ -479,7 +469,7 @@ begin
 
   movesLeft   := Panel.Left + Panel.Width + SideMargin;
   movesTop    := Panel.Top;
-  movesWidth  := 200;  // stała szerokość listy ruchów
+  movesWidth  := 200;
   movesHeight := Panel.Height * MovesPct div 100;
   lstMoves.SetBounds(movesLeft, movesTop, movesWidth, movesHeight);
 
@@ -490,12 +480,9 @@ begin
   btnSavePGN.Left := btnResign.Left + btnResign.Width;
   btnSavePGN.Top := btnResign.Top;
 
-
-
-
-    SetupCoordinatesLeftAndBottom;
-    UpdateYourLabelsPosition;
-    UpdateOpponentLabelsPosition;
+  SetupCoordinatesLeftAndBottom;
+  UpdateYourLabelsPosition;
+  UpdateOpponentLabelsPosition;
   end
 
 
@@ -503,34 +490,19 @@ begin
   else
   begin
 
-
-  // 1) Ile mamy miejsca – bierzemy mniejszy wymiar okna
   avail := Min(ClientWidth, ClientHeight);
-
-  // 2) Skalujemy do zadanej procentowo wartości
   boardSize := (avail * ScalePercent) div 100;
 
-  // 3) Dzielimy na 8 pól i wyrównujemy do wielokrotności 8
   cellSize  := boardSize div 8;
   boardSize := cellSize * 8;
 
   boardLeft := 60;
   boardTop  := (ClientHeight - boardSize) div 2;
 
-
-  // szerokość stała albo procentowa
-
-
-  // wysokość 60% planszy
   chatHeight := Panel.Height * ChatHeightPercent div 100;
 
-
-
-
-  // 5) Ustawiamy Panel (planszę)
   Panel.SetBounds(boardLeft, boardTop, boardSize, boardSize);
 
-  // 6) Przesuwamy / skalujemy istniejące pola
   for i := 0 to 7 do
     for j := 0 to 7 do
       BoardPanels[i,j].SetBounds(j*cellSize, i*cellSize, cellSize, cellSize);
@@ -541,7 +513,6 @@ begin
   begin
     for i := 0 to 7 do
       for j := 0 to 7 do
-        // nowe położenie: zamieniamy i<->j i lustrujemy indeksy 7-i,7-j
         BoardPanels[i,j].SetBounds(
           (7-j)*cellSize,
           (7-i)*cellSize,
@@ -552,7 +523,7 @@ begin
 
   movesLeft   := Panel.Left + Panel.Width + SideMargin;
   movesTop    := Panel.Top;
-  movesWidth  := 200;  // stała szerokość listy ruchów
+  movesWidth  := 200;
   movesHeight := Panel.Height * MovesPct div 100;
   lstMoves.SetBounds(movesLeft, movesTop, movesWidth, movesHeight);
 
@@ -602,13 +573,11 @@ var
   cellSize, boardLeft, boardTop: Integer;
   square: TPanel;
 begin
-  // 1) Oblicz rozmiar komórki i pozycję planszy
-  cellSize  := 60;             // lub np. Panel.Width div 8, jeśli Panel już ma Align=alClient
+  cellSize  := 60;
   boardLeft := 50;
   boardTop  := 50;
   Panel.SetBounds(boardLeft, boardTop, cellSize*8, cellSize*8);
 
-  // 2) Tworzymy pola
   for i := 0 to 7 do
     for j := 0 to 7 do
     begin
@@ -619,7 +588,7 @@ begin
       square.Tag              := i*8 + j;
       square.OnClick          := PanelClick;
       square.Alignment        := taCenter;
-      square.Font.Size        := cellSize div 2;          // proporcjonalnie do cellSize
+      square.Font.Size        := cellSize div 2;
       square.ParentBackground := False;
       if (i + j) mod 2 = 0 then
         square.Color := RGB(198,169,115)
@@ -707,59 +676,30 @@ begin
     begin
     PromotionFlag:=true;
 
-        if MyColor = 'BLACK' then
-
-        begin
-
-        case Move[5] of
-        'q': promotionChar := 'QW';
-        'r': promotionChar := 'RW';
-        'b': promotionChar := 'BW';
-        'n': promotionChar := 'KW';
-
-
+       if MyColor = 'BLACK' then
+       begin
+          case Move[5] of
+          'q': promotionChar := 'QW';
+          'r': promotionChar := 'RW';
+          'b': promotionChar := 'BW';
+          'n': promotionChar := 'KW';
         end;
 
-        end
+       end
 
        else
-       begin
-
-       case Move[5] of
-       'q': promotionChar := 'QB';
-       'r': promotionChar := 'RB';
-       'b': promotionChar := 'BB';
-       'n': promotionChar := 'KB';
-
-
+         begin
+           case Move[5] of
+           'q': promotionChar := 'QB';
+           'r': promotionChar := 'RB';
+           'b': promotionChar := 'BB';
+           'n': promotionChar := 'KB';
+         end;
 
        end;
-
-
-
-
-       end;
-
-
-
-
 
 
     end;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     Result := True;
@@ -800,10 +740,6 @@ begin
 
 
 end;
-
-
-
-
 
 
 procedure TChess.UpdateClockLabels;
@@ -881,46 +817,37 @@ begin
 end;
 
 
-
-
-
-
 procedure TChess.InitializeState;
 var i, j: Integer;
-  output, move: string;
-  parts: TArray<string>;
+  output: string;
   sr, sc, tr, tc: Integer;
   San: String;
   promo: Tpiece;
 begin
 
-    HasWhiteKingMoved:= false;
-    HasWhiteRookA1Moved:= false;
-    HasWhiteRookH1Moved:= false;
-    HasBlackKingMoved:= false;
-    HasBlackRookA8Moved:= false;
-    HasBlackRookH8Moved:= false;
+ HasWhiteKingMoved:= false;
+ HasWhiteRookA1Moved:= false;
+ HasWhiteRookH1Moved:= false;
+ HasBlackKingMoved:= false;
+ HasBlackRookA8Moved:= false;
+ HasBlackRookH8Moved:= false;
 
-  // Wyzeruj stan
   for i := 0 to 7 do
     for j := 0 to 7 do
       BoardState[i,j] := ptNone;
 
-  // Białe figury
   BoardState[7,0] := ptWRook; BoardState[7,1] := ptWKnight;
   BoardState[7,2] := ptWBishop; BoardState[7,3] := ptWQueen;
   BoardState[7,4] := ptWKing; BoardState[7,5] := ptWBishop;
   BoardState[7,6] := ptWKnight;BoardState[7,7] := ptWRook;
   for j := 0 to 7 do BoardState[6,j] := ptWPawn;
 
-  // Czarne
   BoardState[0,0] := ptBRook; BoardState[0,1] := ptBKnight;
   BoardState[0,2] := ptBBishop;BoardState[0,3] := ptBQueen;
   BoardState[0,4] := ptBKing;  BoardState[0,5] := ptBBishop;
   BoardState[0,6] := ptBKnight;BoardState[0,7] := ptBRook;
   for j := 0 to 7 do BoardState[1,j] := ptBPawn;
 
-  // Ustaw UI
   for i := 0 to 7 do
     for j := 0 to 7 do
       BoardPanels[i,j].Caption := PieceToChar(BoardState[i,j]);
@@ -929,73 +856,39 @@ begin
   LastSrc := Point(-1,-1);
   LastDst := Point(-1,-1);
   IsMyTurn := False;
- // Resize;
 
   if GameType = 4 then
   begin
 
   If MyColor='BLACK' then
-      begin
+   begin
 
+    Uci.SendCommand('position startpos moves ' + FMoveHistory);
+    Uci.SendCommand('go depth 12');
 
-
-  // 1. Aktualizuj pozycję (np. przechowuj historię ruchów w FMoveHistory)
-  Uci.SendCommand('position startpos moves ' + FMoveHistory);
-
-  // 2. Poproś o najlepszy ruch
-  Uci.SendCommand('go depth 12');
-
-  // 3. Odbierz wynik
-  repeat
+    repeat
     output := Uci.ReadOutput;
-  until output.Contains('bestmove');
-
-  // 4. Parsuj "bestmove e2e4"
-
-  var move2 := ExtractBestMove(output);
-
-
-  if (move2 <> '') and UciToCoords(move2, sr, sc, tr, tc) then
-      begin
-
-
-    var wasCapture := BoardState[tr, tc] <> ptNone;
-    var   p := BoardState[sr, sc];      // ← zapamiętujemy przed apply
-
-      san := MoveToSAN(
-      p,
-      Point(sc, sr),
-      Point(tc, tr),
-      wasCapture,
-      promo
-      );
-
-
-
-  ApplyMove(sr, sc, tr, tc, ptNone);
-
-
-        if PromotionFlag then
-      begin
-        // PromotionChar ustawiasz gdzie indziej jako 'Q','N' itd.
-       promo := CodeToPiece(PromotionChar);
-
-        // (napisz własną funkcję mapującą)
-      end
-      else
+    until output.Contains('bestmove');
+    var move2 := ExtractBestMove(output);
+    if (move2 <> '') and UciToCoords(move2, sr, sc, tr, tc) then
+    begin
+      var wasCapture := BoardState[tr, tc] <> ptNone;
+      var   p := BoardState[sr, sc];
+      san:=MoveToSAN(p,Point(sc,sr),Point(tc,tr),wasCapture,promo);
+      ApplyMove(sr, sc, tr, tc, ptNone);
+          if PromotionFlag then
+        begin
+        promo := CodeToPiece(PromotionChar);
+        end
+        else
         promo := ptNone;
 
       san:= san+SanHelper(promo);
-
-
-
       AddMoveToList(san);
+      FMoveHistory := FMoveHistory + ' ' + move2;
+      IsMyTurn:=True;
 
-
-
-  FMoveHistory := FMoveHistory + ' ' + move2;
-  IsMyTurn:=True;
-     end
+       end
 
 
 
@@ -1027,10 +920,9 @@ begin
 
   square := Sender as TPanel;
   idx := square.Tag;
-  vRow := idx div 8; // wizualny rząd
-  vCol := idx mod 8; // wizualna kolumna
+  vRow := idx div 8;
+  vCol := idx mod 8;
 
-  // MAPUJEMY na logiczne współrzędne:
   if MyColor = 'BLACK' then
   begin
     row := 7 - vRow;
@@ -1042,12 +934,8 @@ begin
     col := vCol;
   end;
 
-
-
-  // Teraz zamiast BoardState[vRow,vCol] robimy BoardState[row,col]:
   if (SelectedSrc.X < 0) and OwnsPiece(BoardState[row,col]) then
   begin
-    // Zaznaczenie źródła:
     SelectedSrc := Point(col, row);
     SelectedPanel := square;
     square.Color := clYellow;
@@ -1065,30 +953,17 @@ begin
     if IsLegalMove(srcRow, srcCol, dstRow, dstCol) then
     begin
       wasCapture := BoardState[dstRow, dstCol] <> ptNone;
-      var  p := BoardState[srcRow, srcCol];      // ← zapamiętujemy przed apply
-
-      san := MoveToSAN(
-      p,
-      Point(srcCol, srcRow),
-      Point(dstCol, dstRow),
-      wasCapture,
-      promo
-      );
-
-
+      var  p := BoardState[srcRow, srcCol];
+      san:=MoveToSAN(p,Point(srcCol, srcRow), Point(dstCol, dstRow), wasCapture, promo);
       ApplyMove(srcRow, srcCol, dstRow, dstCol, ptNone);
 
-
-          if PromotionFlag then
+      if PromotionFlag then
       begin
-        // PromotionChar ustawiasz gdzie indziej jako 'Q','N' itd.
        promo := CodeToPiece(PromotionChar);
        temppromo:=PromotionChar;
-
-        // (napisz własną funkcję mapującą)
       end
       else
-        promo := ptNone;
+      promo := ptNone;
 
       san:= san+SanHelper(promo);
 
@@ -1103,7 +978,6 @@ begin
      if (temppromo = 'BW') or (temppromo ='BB') then moveUci:= moveUci+'b';
      if (temppromo = 'KW') or (temppromo ='KB') then moveUci:= moveUci+'n';
 
-      // 2. Dodaj do historii
       if ModifiedPGN <> '' then
         ModifiedPGN := ModifiedPGN + ' ' + moveUci
       else
@@ -1131,11 +1005,8 @@ begin
 
       if Draw then EXIT;
       if Win then EXIT;
-       
 
       IsMyTurn := False;
-
-       // 1. Zamień ruch człowieka na UCI
       srcUci := Chr(Ord('a') + srcCol) + IntToStr(8 - srcRow);
       dstUci := Chr(Ord('a') + dstCol) + IntToStr(8 - dstRow);
       moveUci := srcUci + dstUci;
@@ -1147,30 +1018,25 @@ begin
      if (temppromo = 'BW') or (temppromo ='BB') then moveUci:= moveUci+'b';
      if (temppromo = 'KW') or (temppromo ='KB') then moveUci:= moveUci+'n';
 
-      // 2. Dodaj do historii
       if FMoveHistory <> '' then
         FMoveHistory := FMoveHistory + ' ' + moveUci
       else
         FMoveHistory := moveUci;
 
-      // 3. Zaktualizuj pozycję w Stockfish
-
       Uci.SendCommand('position startpos moves ' + FMoveHistory);
       Uci.SendCommand('go depth 2');
 
-      // 4. Poczekaj na odpowiedź
       var output: string;
       repeat
         output := Uci.ReadOutput;
       until output.Contains('bestmove');
 
-      // 5. Parsuj odpowiedź
       var parts := ExtractBestMove(output);
       if (Length(parts) >= 2) and UciToCoords(parts, sr, sc, tr, tc) then
       begin
 
-         wasCapture := BoardState[tr, tc] <> ptNone;
-         p := BoardState[sr, sc];      // ← zapamiętujemy przed apply
+      wasCapture := BoardState[tr, tc] <> ptNone;
+      p := BoardState[sr, sc];
 
       san := MoveToSAN(
       p,
@@ -1188,8 +1054,7 @@ begin
 
           if PromotionFlag then
       begin
-        // PromotionChar ustawiasz gdzie indziej jako 'Q','N' itd.
-       promo := CodeToPiece(PromotionChar);
+      promo := CodeToPiece(PromotionChar);
       BoardState[tr, tc] := promo;
       BoardPanels[tr, tc].Caption := PieceToChar(promo);
       UpdateBoardColors;
@@ -1216,7 +1081,7 @@ begin
 
         CheckEndgame;
         FMoveHistory := FMoveHistory + ' ' + parts;
-        IsMyTurn := True; // teraz znów kolej człowieka
+        IsMyTurn := True;
       end;
 
 
@@ -1258,10 +1123,8 @@ begin
 
     end;
 
-    // odznaczamy panel źródłowy:
     if Assigned(SelectedPanel) then
     begin
-      // oryginalny kolor po (vRow+vCol) mod 2:
       if (vRow + vCol) mod 2 = 0 then
         SelectedPanel.Color := RGB(198,169,115)
       else
@@ -1327,17 +1190,13 @@ var
   temppromo: string;
 begin
   if not UserSession.IdTCPClient1.Connected then Exit;
-
-  // 1) Sprawdź, czy są dane
   if UserSession.IdTCPClient1.IOHandler.InputBufferIsEmpty then
     UserSession.IdTCPClient1.IOHandler.CheckForDataOnSource(1);
   if UserSession.IdTCPClient1.IOHandler.InputBufferIsEmpty then Exit;
 
-  // 2) Odczytujemy pierwszy pakiet
   Msg := Trim(UserSession.IdTCPClient1.IOHandler.ReadLn('', 50));
   if Msg = '' then Exit;
 
-  // 3) Obsługa TIME_UPDATE
   if Msg.StartsWith('TIME_UPDATE:') then
   begin
     // synchronizacja czasów
@@ -1348,19 +1207,13 @@ begin
     BlackSeconds := StrToIntDef(bPart, BlackSeconds);
     UpdateClockLabels;
     TurnStartTime := Now;
-
     UpdateTimers;
 
-    //
-
-
-    // 4) Od razu próbujemy odczytać drugi pakiet
     if not UserSession.IdTCPClient1.IOHandler.InputBufferIsEmpty then
     begin
       FollowUp := Trim(UserSession.IdTCPClient1.IOHandler.ReadLn('', 50));
       if FollowUp <> '' then
       begin
-        // sprawdzamy kolejno możliwe typy
         if FollowUp.StartsWith('OPPONENT_MOVE:') then
         begin
           payload := FollowUp.Substring(14).Trim;
@@ -1377,8 +1230,6 @@ begin
              var dstUci := Chr(Ord('a') + tc) + IntToStr(8 - tr);
              moveUci := srcUci + dstUci;
 
-
-            // 2. Dodaj do historii
             if ModifiedPGN <> '' then
               ModifiedPGN := ModifiedPGN + ' ' + moveUci
             else
@@ -1483,12 +1334,10 @@ begin
          if MessageDlg('Przeciwnik proponuje remis. Przyjąć?',
                 mtConfirmation, [mbYes, mbNo], 0) = mrYes then
           begin
-            // zaakceptowano
             SendMove('DRAW:ACCEPT');
           end
           else
           begin
-            // odrzucono
             SendMove('DRAW:DECLINE');
           end;
 
@@ -1524,15 +1373,11 @@ begin
       end;
 
 
-
-
-
     end;
 
     Exit;
   end;
 
-  // 5) Jeśli pierwszy pakiet był od razu OPPONENT_MOVE
   if Msg.StartsWith('OPPONENT_MOVE:') then
   begin
     payload := Msg.Substring(14).Trim;
@@ -1547,8 +1392,6 @@ begin
      var dstUci := Chr(Ord('a') + tc) + IntToStr(8 - tr);
      moveUci := srcUci + dstUci;
 
-
-      // 2. Dodaj do historii
       if ModifiedPGN <> '' then
         ModifiedPGN := ModifiedPGN + ' ' + moveUci
       else
@@ -1575,10 +1418,8 @@ begin
     Exit;
   end;
 
-  // 6) Pozostałe komunikaty
   if Msg = 'START' then
   begin
-  // ShowMessage('Gra rozpoczęta!');
    btnResign.Visible:=true;
    btnDraw.Visible:=true;
    InGame:= True;
@@ -1639,13 +1480,7 @@ begin
     BoardState[LastDst.Y, LastDst.X] := promotionPiece;
     BoardPanels[LastDst.Y, LastDst.X].Caption := PieceToChar(promotionPiece);
     UpdateBoardColors;
-
-
   end
-
-
-
-
 
   else if Msg.StartsWith('ENDGAME:') then
   begin
@@ -1696,18 +1531,17 @@ begin
   end
 
 
- else if Msg.StartsWith('CHAT:') then
-begin
-  memChat.Lines.Add(Msg.Substring(5).Trim);
-  Exit;
-end
+   else if Msg.StartsWith('CHAT:') then
+  begin
+    memChat.Lines.Add(Msg.Substring(5).Trim);
+    Exit;
+  end
 
 
   else if Msg.StartsWith('SAN:') then
    begin
-  // Msg = 'SAN:e4' albo 'SAN:Nf3' albo 'SAN:exd5' itd.
-     AddMoveToList(Msg.Substring(4).Trim);
-     Exit;
+   AddMoveToList(Msg.Substring(4).Trim);
+   Exit;
    end
 
 
@@ -1717,13 +1551,11 @@ end
     if MessageDlg('Przeciwnik proponuje remis. Przyjąć?',
     mtConfirmation, [mbYes, mbNo], 0) = mrYes then
     begin
-    // zaakceptowano
     SendMove('DRAW:ACCEPT');
     end
     else
     begin
-    // odrzucono
-     SendMove('DRAW:DECLINE');
+    SendMove('DRAW:DECLINE');
     end;
 
 
@@ -1758,21 +1590,6 @@ end
 
 end;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 procedure TChess.SetupAfterColor;
 begin
   IsMyTurn := MyColor = 'WHITE';
@@ -1785,7 +1602,6 @@ begin
   end;
   UpdateClockLabels;
 
-  // włącz zegar gracza, wyłącz zegar przeciwnika
   tmrWhite.Enabled := true;
   tmrBlack.Enabled := false;
 
@@ -1804,8 +1620,6 @@ begin
   ReceiveMessages;
 end;
 
-
-
 procedure TChess.RotateBoardForBlack;
 var i, j, sizeCell: Integer;
 begin
@@ -1819,7 +1633,7 @@ begin
         sizeCell,
         sizeCell
       );
-      BoardPanels[i,j].Tag := (7 - i) * 8 + (7 - j); // aktualizacja tagu!
+      BoardPanels[i,j].Tag := (7 - i) * 8 + (7 - j);
     end;
 end;
 
@@ -1860,7 +1674,6 @@ begin
 
   if (Piece = ptNone) then Exit;
 
-// Sprawdź, czy próbujesz zbić własną figurę
 if ((Ord(Piece) in [Ord(ptWPawn)..Ord(ptWKing)]) and (Ord(TargetPiece) in [Ord(ptWPawn)..Ord(ptWKing)]))
    or
    ((Ord(Piece) in [Ord(ptBPawn)..Ord(ptBKing)]) and (Ord(TargetPiece) in [Ord(ptBPawn)..Ord(ptBKing)]))
@@ -2040,9 +1853,7 @@ begin
 
    if BoardState[srcRow,srcCol] = ptWRook then
   begin
-    // biała wieża a1 to srcRow=7,srcCol=0
     if (srcRow=7) and (srcCol=0) then HasWhiteRookA1Moved := True;
-    // biała wieża h1 to srcRow=7,srcCol=7
     if (srcRow=7) and (srcCol=7) then HasWhiteRookH1Moved := True;
   end
   else if BoardState[srcRow,srcCol] = ptBRook then
@@ -2056,7 +1867,6 @@ begin
 
    if (P in [ptWKing, ptBKing]) and (Abs(dstCol - srcCol) = 2) then
 begin
-  // krótkie O-O
   if dstCol = srcCol + 2 then
   begin
     // przesuń wieżę z h-file na f-file
@@ -2074,7 +1884,6 @@ begin
     // przesuń wieżę z a-file na d-file
     BoardState[srcRow,0] := ptNone;
     BoardPanels[srcRow,0].Caption := '';
-   // BoardState[srcRow,3] := IfThen(P=ptWKing, ptWRook, ptBRook);
     if P = ptWKing then
   BoardState[srcRow,3] := ptWRook
   else
@@ -2082,18 +1891,6 @@ begin
     BoardPanels[srcRow,3].Caption := PieceToChar(BoardState[srcRow,3]);
   end;
 end;
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     if ((P = ptWPawn) and (dstRow = 0)) or ((P = ptBPawn) and (dstRow = 7)) then
@@ -2154,9 +1951,6 @@ end;
     promotionChar:='KB'
     end;
 
-
-
-
   end;
 
 
@@ -2195,7 +1989,6 @@ end;
 
 function TChess.PromotePawnDialog(): string;
 const
-  // kolejność: Hetman, Wieża, Goniec, Skoczek
   WhitePieces: array[0..3] of string = ('♕','♖','♗','♘');
   BlackPieces: array[0..3] of string = ('♛','♜','♝','♞');
 var
@@ -2204,7 +1997,6 @@ var
   i, btnWidth: Integer;
   arr: array of string;
 begin
-  // wybierz tablicę figur
   if MyColor = 'WHITE' then
   begin
     SetLength(arr, Length(WhitePieces));
@@ -2216,7 +2008,6 @@ begin
     for i := 0 to High(BlackPieces) do arr[i] := BlackPieces[i];
   end;
 
-  // utwórz dialog
   dlg := TForm.Create(nil);
   try
     dlg.Caption := 'Promocja pionka';
@@ -2225,7 +2016,7 @@ begin
     dlg.ClientWidth := 100 * Length(arr) + 20;
     dlg.ClientHeight := 100;
 
-    promotionSelection := 0; // domyślne: hetman
+    promotionSelection := 0;
     btnWidth := (dlg.ClientWidth - 20) div Length(arr);
 
     for i := 0 to High(arr) do
@@ -2241,7 +2032,7 @@ begin
     if dlg.ShowModal = mrOk then
       Result := arr[promotionSelection]
     else
-      Result := arr[0]; // hetman jako domyślna
+      Result := arr[0];
   finally
     dlg.Free;
   end;
@@ -2296,8 +2087,6 @@ begin
         Exit(True);
     end;
   end;
-
-
 
   // 2) Ataki skoczkiem
   for i := 0 to High(KnightOffsets) do
@@ -2389,8 +2178,6 @@ begin
   else
     Result := 'WHITE';
 end;
-
-
 
 
 
@@ -2582,10 +2369,6 @@ begin
 end;
 
 
-
-
-
-
 procedure TChess.UpdateTimers;
 begin
   tmrWhite.Enabled := False;
@@ -2628,22 +2411,18 @@ end;
 procedure TChess.SetupCoordinatesLeftAndBottom;
 const
   Letters: array[1..8] of string = ('A','B','C','D','E','F','G','H');
-  MarginBelowBoard = 5;   // przerwa tuż pod planszą
+  MarginBelowBoard = 5;
 var
   i, cellSize, coordRowHeight, x, y: Integer;
   lbl: TLabel;
 begin
-  // 1) Usuń stare etykiety z Tag=1234
+
   for i := ComponentCount - 1 downto 0 do
     if (Components[i] is TLabel) and (TLabel(Components[i]).Tag = 1234) then
       FreeAndNil(Components[i]);
 
   cellSize       := Panel.Width div 8;
   coordRowHeight := cellSize div 4;
-
-
-
-
 
 
   if MyColor = 'BLACK' then
@@ -2680,10 +2459,10 @@ begin
     lbl.Alignment := taCenter;
     lbl.Font.Size := Max(8, cellSize div 6);
     lbl.SetBounds(
-      x + (i-1)*cellSize,  // kolejne kolumny
-      y,                   // wspólna wartość Y
-      cellSize,
-      coordRowHeight
+    x + (i-1)*cellSize,
+    y,
+    cellSize,
+    coordRowHeight
     );
   end;
 
@@ -2712,15 +2491,13 @@ begin
     lbl.Alignment := taCenter;
     lbl.Font.Size := Max(8, cellSize div 6);
     lbl.SetBounds(
-      Panel.Left - cellSize div 4,
-      Panel.Top + (i-1)*cellSize,
-      cellSize div 4,
-      cellSize
+    Panel.Left - cellSize div 4,
+    Panel.Top + (i-1)*cellSize,
+    cellSize div 4,
+    cellSize
     );
   end;
 
-
-  // 3) litery A–H tuż pod planszą, nad zegarem
   y := Panel.Top + Panel.Height + MarginBelowBoard;
   x := Panel.Left;
   for i := 1 to 8 do
@@ -2732,30 +2509,16 @@ begin
     lbl.Alignment := taCenter;
     lbl.Font.Size := Max(8, cellSize div 6);
     lbl.SetBounds(
-      x + (i-1)*cellSize,  // kolejne kolumny
-      y,                   // wspólna wartość Y
-      cellSize,
-      coordRowHeight
+    x + (i-1)*cellSize,
+    y,
+    cellSize,
+    coordRowHeight
     );
   end;
 
 
 
-
-
   end;
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2766,40 +2529,36 @@ end;
 
 procedure TChess.UpdateClockLabelsPosition;
 const
-  MarginTop    = 5;  // odstęp od planszy
-  MarginBottom = 5;  // odstęp od koordynatów
+  MarginTop    = 5;
+  MarginBottom = 5;
 var
   cellSize, coordRowHeight: Integer;
 begin
   cellSize        := Panel.Width div 8;
-  coordRowHeight  := cellSize div 4;  // zgodnie z SetupCoordinates
+  coordRowHeight  := cellSize div 4;
 
 
 
   if MyColor = 'BLACK' then
   begin
 
-    // — Biały zegar — bez zmian —
+
   lblWhiteTime.Font.Size := Max(14, cellSize div 4);
   lblWhiteTime.SetBounds(
-    Panel.Left + Panel.Width - lblWhiteTime.Width,
-    Panel.Top  - lblWhiteTime.Height - MarginTop,
-    lblWhiteTime.Width,
-    lblWhiteTime.Height
+  Panel.Left + Panel.Width - lblWhiteTime.Width,
+  Panel.Top  - lblWhiteTime.Height - MarginTop,
+  lblWhiteTime.Width,
+  lblWhiteTime.Height
   );
   lblWhiteTime.Alignment := taRightJustify;
   lblWhiteTime.BringToFront;
 
-  // — Czarny zegar — teraz pod koordynatami —
   lblBlackTime.Font.Size := Max(14, cellSize div 4);
   lblBlackTime.SetBounds(
-    Panel.Left + Panel.Width - lblBlackTime.Width,
-    // Panel.Top + Panel.Height → dół planszy
-    // + coordRowHeight       → wysokość rzędu liter
-    // + MarginBottom         → odstęp
-    Panel.Top  + Panel.Height + coordRowHeight + MarginBottom,
-    lblBlackTime.Width,
-    lblBlackTime.Height
+  Panel.Left + Panel.Width - lblBlackTime.Width,
+  Panel.Top  + Panel.Height + coordRowHeight + MarginBottom,
+  lblBlackTime.Width,
+  lblBlackTime.Height
   );
   lblBlackTime.Alignment := taRightJustify;
   lblBlackTime.BringToFront;
@@ -2810,27 +2569,22 @@ begin
   else
   begin
 
-    // — Biały zegar — bez zmian —
   lblBlackTime.Font.Size := Max(14, cellSize div 4);
   lblBlackTime.SetBounds(
-    Panel.Left + Panel.Width - lblBlackTime.Width,
-    Panel.Top  - lblWhiteTime.Height - MarginTop,
-    lblBlackTime.Width,
-    lblBlackTime.Height
+  Panel.Left + Panel.Width - lblBlackTime.Width,
+  Panel.Top  - lblWhiteTime.Height - MarginTop,
+  lblBlackTime.Width,
+  lblBlackTime.Height
   );
   lblBlackTime.Alignment := taRightJustify;
   lblBlackTime.BringToFront;
 
-  // — Czarny zegar — teraz pod koordynatami —
   lblWhiteTime.Font.Size := Max(14, cellSize div 4);
   lblWhiteTime.SetBounds(
-    Panel.Left + Panel.Width - lblWhiteTime.Width,
-    // Panel.Top + Panel.Height → dół planszy
-    // + coordRowHeight       → wysokość rzędu liter
-    // + MarginBottom         → odstęp
-    Panel.Top  + Panel.Height + coordRowHeight + MarginBottom,
-    lblWhiteTime.Width,
-    lblWhiteTime.Height
+  Panel.Left + Panel.Width - lblWhiteTime.Width,
+  Panel.Top  + Panel.Height + coordRowHeight + MarginBottom,
+  lblWhiteTime.Width,
+  lblWhiteTime.Height
   );
   lblWhiteTime.Alignment := taRightJustify;
   lblWhiteTime.BringToFront;
@@ -2869,7 +2623,6 @@ begin
   else
   begin
 
-    // OppLogin/OppRanking nad planszą
   OppLogin.Top    := Panel.Top - OppLogin.Height - OffsetY;
   OppLogin.Left   := Panel.Left;
   OppRanking.Top  := OppLogin.Top;
@@ -2891,7 +2644,7 @@ end;
 procedure TChess.UpdateYourLabelsPosition;
 const
   SpacingX = 20;
-  LowerLabelsOffset = 20; // już zadeklarowane wyżej
+  LowerLabelsOffset = 20;
 var
   coordRowHeight: Integer;
 begin
@@ -2899,7 +2652,7 @@ begin
 
   if GameType = 5 then
   begin
-  YourLogin.Font.Size   := 18;   // proporcjonalne
+  YourLogin.Font.Size   := 18;
   YourLogin.Top  := Panel.Top + Panel.Height + coordRowHeight + LowerLabelsOffset;
   YourLogin.Left := Panel.Left;
   YourLogin.BringToFront;
@@ -2909,7 +2662,7 @@ begin
 
   else if GameType = 4  then
   begin
-  YourLogin.Font.Size   := 18;   // proporcjonalne
+  YourLogin.Font.Size   := 18;
   YourLogin.Top  := Panel.Top + Panel.Height + coordRowHeight + LowerLabelsOffset;
   YourLogin.Left := Panel.Left;
   YourLogin.BringToFront;
@@ -2920,12 +2673,9 @@ begin
 
   else
   begin
-    // Obliczamy wysokość rzędu z literami (koordynatami)
-  coordRowHeight := (Panel.Width div 8) div 4;
-  // bo w SetupCoordinates robiliśmy: cellSize div 4 dla wysokości liter
 
-  // Twoje labele -- poniżej planszy + koordynaty + dodatkowy offset
-  YourLogin.Font.Size   := 18;   // proporcjonalne
+  coordRowHeight := (Panel.Width div 8) div 4;
+  YourLogin.Font.Size   := 18;
   YourRanking.Font.Size := 14;
   YourLogin.Top  := Panel.Top + Panel.Height + coordRowHeight + LowerLabelsOffset;
   YourLogin.Left := Panel.Left;
@@ -2945,28 +2695,25 @@ end;
 
 procedure TChess.CreateChatControls;
 begin
-  // 1) Panel chatu
+
   pnlChat := TPanel.Create(Self);
   pnlChat.Parent := Self;
   pnlChat.BevelOuter := bvNone;
-  // Pozycję i rozmiar ustawimy w FormResize
   pnlChat.Align := alNone;
 
-  // 2) Memo historii
+
   memChat := TMemo.Create(Self);
   memChat.Parent := pnlChat;
   memChat.Align := alClient;
   memChat.ReadOnly := True;
   memChat.ScrollBars := ssVertical;
 
-  // 3) Edit pola wejścia
   edtChat := TEdit.Create(Self);
   edtChat.Parent := pnlChat;
   edtChat.Align := alBottom;
   edtChat.Height := 24;
   edtChat.OnKeyPress := edtChatKeyPress;
 
-  // 4) Przycisk Wyślij
   btnSend := TButton.Create(Self);
   btnSend.Parent := pnlChat;
   btnSend.Align := alRight;
@@ -3004,7 +2751,7 @@ begin
 
   lstMoves := TListBox.Create(Self);
   lstMoves.Parent      := Self;
-  lstMoves.Align       := alNone;   // ustawimy w FormResize
+  lstMoves.Align       := alNone;
   lstMoves.ItemHeight  := 24;
   lstMoves.Font.Size   := 16;
 end;
@@ -3084,19 +2831,16 @@ begin
 
   if (idx mod 2) = 0 then
   begin
-    // pierwszy ruch pary (biały) ⇒ nowa linia "1. E2-E4"
     line := Format('%d. %s', [idx div 2 + 1, Move]);
     lstMoves.Items.Add(line);
   end
   else
   begin
-    // drugi ruch pary (czarny) ⇒ dopisz do ostatniej linii
     line := lstMoves.Items[lstMoves.Items.Count-1] +
             '   ' + Move;
     lstMoves.Items[lstMoves.Items.Count-1] := line;
   end;
 
-  // przewiń do dołu
   lstMoves.ItemIndex := lstMoves.Items.Count - 1;
 end;
 
@@ -3104,7 +2848,6 @@ end;
 
 function TChess.CanReach(const From, To2: TPoint; Piece: TPiece): Boolean;
 begin
-  // zakładam, że masz metodę IsLegalMove(srcRow, srcCol, dstRow, dstCol)
   Result := IsLegalMove(From.Y, From.X, To2.Y, To2.X);
 end;
 
@@ -3126,18 +2869,15 @@ var
   needFile: Boolean;
   candidates: TList<TPoint>;
 begin
-  // 0) remis
   if Draw then
     Exit('½-½');
 
-  // 1) roszada
   if Piece in [ptWKing, ptBKing] then
   begin
     if (Src.X = 4) and (Dst.X = 6) then Exit('O-O');
     if (Src.X = 4) and (Dst.X = 2) then Exit('O-O-O');
   end;
 
-  // 2) figura (prefix)
   isPawn := Piece in [ptWPawn, ptBPawn];
   case Piece of
     ptWPawn, ptBPawn: prefix := '';
@@ -3147,14 +2887,11 @@ begin
     ptWBishop, ptBBishop: prefix := 'B';
     ptWKnight, ptBKnight: prefix := 'N';
   end;
-
-
   disambig := '';
 if prefix <> '' then
 begin
    candidates := TList<TPoint>.Create;
   try
-    // dodaj oryginalną pozycję
     candidates.Add(Src);
 
     // znajdź inne figury tego samego typu
@@ -3162,13 +2899,11 @@ begin
       for  c := 0 to 7 do
         if (r <> Src.Y) or (c <> Src.X) then
           if BoardState[r, c] = Piece then
-            // używamy Twojej CanReach (czyli IsLegalMove)
             if CanReach(Point(c, r), Dst, Piece) then
               candidates.Add(Point(c, r));
 
     if candidates.Count > 1 then
     begin
-      // czy wskazać plikę (kolumnę)?
        needFile := False;
       for var i := 0 to candidates.Count - 1 do
         if candidates[i].X <> Src.X then
@@ -3187,10 +2922,6 @@ begin
   end;
 end;
 
-
-
-
-  // 5) bicie
   if Capture then
     if isPawn then
       action := Chr(Ord('a') + Src.X) + 'x'
@@ -3199,17 +2930,11 @@ end;
   else
     action := '';
 
-  // 6) dest
   dest := Chr(Ord('a') + Dst.X) + IntToStr(8 - Dst.Y);
-
-  // 8) składanie
   Result := prefix + disambig + action + dest;
 
 
 end;
-
-
-
 
 
 
@@ -3220,11 +2945,6 @@ promoPart: string;
 
 begin
 
- // 7) promocja
-
-
-
-
   case Promotion of
     ptWQueen, ptBQueen:   promoPart := '=Q';
     ptWRook, ptBRook:     promoPart := '=R';
@@ -3234,10 +2954,7 @@ begin
     promoPart := '';
   end;
 
-  // 8) składanie
   Result :=  promoPart;
-
-  // 9) szach/mat
   isCheck := IsInCheck(OpponentColor);
   isMate  := isCheck and not HasAnyLegalMove(OpponentColor);
 
@@ -3265,12 +2982,6 @@ begin
 end;
 
 
-
-
-
-
-
-
 function TChess.CodeToPiece(const promoCode: string): TPiece;
 begin
   if promoCode = 'QW' then Exit(ptWQueen)
@@ -3283,10 +2994,6 @@ begin
   else if promoCode = 'KB' then Exit(ptBKnight)
   else Exit(ptNone);
 end;
-
-
-
-
 
 function TChess.InsufficientMaterial: Boolean;
 var
@@ -3306,17 +3013,12 @@ begin
         others[High(others)] := piece;
       end;
     end;
-
-  // brak innych figur niż króle
   if Length(others) = 0 then
     Exit(True);
 
-  // tylko jedna lekka figura
   if (Length(others) = 1) and
      (others[0] in [ptWBishop, ptBBishop, ptWKnight, ptBKnight]) then
     Exit(True);
-
-  // TODO: opcjonalnie obsłuż przypadek goniec vs goniec na tym samym kolorze
 
   Result := False;
 end;
@@ -3336,7 +3038,7 @@ begin
 
     if SaveDlg.Execute then
     begin
-      PGNText := MoveListToPGN(true); // ← generujesz PGN ze swojej listy ruchów
+      PGNText := MoveListToPGN(true);
 
       AssignFile(PGNFile, SaveDlg.FileName);
       Rewrite(PGNFile);
@@ -3359,8 +3061,6 @@ var
   Moves: TArray<string>;
 begin
   Result := '';
-
-  // Nagłówki PGN
   Result := Result + '[Event "Chess Game"]' + sLineBreak;
   Result := Result + '[Site "Local"]' + sLineBreak;
   Result := Result + '[Date "' + FormatDateTime('yyyy.MM.dd', Now) + '"]' + sLineBreak;
@@ -3396,16 +3096,9 @@ begin
   end;
 
 
-
-
-
-
   end;
 
 
-
-
-  // Wynik w tagu
   if Win and (MyColor = 'WHITE') then
     ResultTag := '1-0'
   else if Win and (MyColor = 'BLACK') then
@@ -3450,7 +3143,6 @@ begin
 
   end;
 
-  // Wynik na końcu
   Result := Result + ResultTag;
 end;
 
@@ -3480,18 +3172,14 @@ procedure TChess.LoadGameFromDB(AGameID: Integer; Opponent: string);
 var
   PGNText, CleanPGN: string;
   MovesArray: TArray<string>;
-  i: Integer;
   Move: string;
   WhiteID, BlackID: Integer;
 begin
   FMoveHistory := '';
   OppLogin.Caption:=Opponent;
   CreateMovesList;
-
-
-
   AnalysisGrid := TStringGrid.Create(Self);
-  AnalysisGrid.Parent := LstMoves.Parent;  // 🔹 ważne!
+  AnalysisGrid.Parent := LstMoves.Parent;
   AnalysisGrid.Top := LstMoves.Top + LstMoves.Height + 8;
   AnalysisGrid.Left := LstMoves.Left;
   AnalysisGrid.Width := LstMoves.Width;
@@ -3505,8 +3193,8 @@ begin
 
   AnalysisGrid.Cells[0, 0] := 'Eval';
   AnalysisGrid.Cells[1, 0] := 'Best line';
-  AnalysisGrid.ColWidths[0] := 50;
-  AnalysisGrid.ColWidths[1] := 300;
+  AnalysisGrid.ColWidths[0] := 60;
+  AnalysisGrid.ColWidths[1] := AnalysisGrid.ClientWidth - 80;
 
 
   FDQuery1.Connection := FDConnection1;
@@ -3523,47 +3211,34 @@ begin
   PGNText := FDQuery1.FieldByName('pgn').AsString;
   WhiteID := FDQuery1.FieldByName('whiteplayerid').AsInteger;
   BlackID := FDQuery1.FieldByName('blackplayerid').AsInteger;
-
-  // 🔹 Ustal kolor aktualnego użytkownika
   if UserSession.LoggedUserID = WhiteID then
     MyColor := 'WHITE'
   else if UserSession.LoggedUserID = BlackID then
     MyColor := 'BLACK';
 
     CleanPGN := PGNText;
-
-  // usuń nagłówki w nawiasach []
   while Pos('[', CleanPGN) > 0 do
     Delete(CleanPGN, Pos('[', CleanPGN), Pos(']', CleanPGN) - Pos('[', CleanPGN) + 1);
 
-  // usuń wyniki
   CleanPGN := StringReplace(CleanPGN, '1-0', '', [rfReplaceAll]);
   CleanPGN := StringReplace(CleanPGN, '0-1', '', [rfReplaceAll]);
   CleanPGN := StringReplace(CleanPGN, '1/2-1/2', '', [rfReplaceAll]);
-
-  // usuń znaki nowej linii
   CleanPGN := StringReplace(CleanPGN, sLineBreak, ' ', [rfReplaceAll]);
-
-  // 🔹 usuń numeracje typu "1.", "23.", "105."
   CleanPGN := TRegEx.Replace(CleanPGN, '\d+\.', ' ');
 
-  // 🔹 usuń podwójne spacje
   while Pos('  ', CleanPGN) > 0 do
     CleanPGN := StringReplace(CleanPGN, '  ', ' ', [rfReplaceAll]);
 
   CleanPGN := Trim(CleanPGN);
-
-  // 🔹 Rozbij na tablicę po spacji
   MovesArray := CleanPGN.Split([' '], TStringSplitOptions.ExcludeEmpty);
 
-  // 🔹 Dodaj każdy ruch do listy
   for Move in MovesArray do
-    AddMoveToList(Move);
+  AddMoveToList(Move);
+
 
   CurrentMoveIndex := 0;
 
 end;
-
 
 procedure TChess.ApplyMoveFromUCI(const MoveUCI: string);
 var
@@ -3575,27 +3250,18 @@ begin
     promo := ptNone;
     ApplyMove(sr, sc, tr, tc, promo);
 
-     if PromotionFlag then
-      begin
-        // PromotionChar ustawiasz gdzie indziej jako 'Q','N' itd.
+    if PromotionFlag then
+    begin
       promo := CodeToPiece(PromotionChar);
       BoardState[tr, tc] := promo;
       BoardPanels[tr, tc].Caption := PieceToChar(promo);
       UpdateBoardColors;
-
-     end;
-
-     if FMoveHistory <> '' then
-      FMoveHistory := FMoveHistory + ' ' + MoveUCI
-    else
-      FMoveHistory := MoveUCI;
-
-
-
-
+      PromotionChar := '';
+      PromotionFlag := False;
+    end;
+  end;
 end;
 
-end;
 
 
 
@@ -3603,79 +3269,117 @@ function ParseMultiPV(const Output: string): TArray<TAnalysisLine>;
 var
   Lines: TStringList;
   Line: string;
-  Res: TList<TAnalysisLine>;
-  ScorePos, PvPos: Integer;
-  ScoreStr, PvStr: string;
-  val: Double;
+  Dict: TDictionary<Integer, TAnalysisLine>;
+  parts: TArray<string>;
+  i, multiPVNum, cpIndex, j: Integer;
+  scoreValue: Double;
+  cpStr, pvStr: string;
   ALine: TAnalysisLine;
+  Keys: TArray<Integer>;
 begin
   Lines := TStringList.Create;
-  Res := TList<TAnalysisLine>.Create;
+  Dict := TDictionary<Integer, TAnalysisLine>.Create;
   try
     Lines.Text := Output;
 
     for Line in Lines do
     begin
-      if Line.Contains('multipv') and Line.Contains('score cp ') then
+      if (Line.Contains('multipv')) and (Line.Contains('score cp ')) then
       begin
-        ScorePos := Pos('score cp ', Line);
-        PvPos := Pos(' pv ', Line);
-        if (ScorePos > 0) and (PvPos > 0) then
-        begin
-          ScoreStr := Copy(Line, ScorePos + 9, PvPos - (ScorePos + 9));
-          PvStr := Copy(Line, PvPos + 4, MaxInt);
-          val := StrToFloatDef(Trim(ScoreStr), 0) / 100.0;
+        parts := Line.Split([' ']);
 
-          ALine.Score := val;
-          ALine.Moves := PvStr;
-          Res.Add(ALine);
-        end;
+        multiPVNum := -1;
+        for i := 0 to High(parts) - 1 do
+          if (parts[i] = 'multipv') and TryStrToInt(parts[i + 1], multiPVNum) then
+            Break;
+        if multiPVNum = -1 then
+          Continue;
+
+        cpIndex := -1;
+        for i := 0 to High(parts) - 1 do
+          if parts[i] = 'cp' then
+          begin
+            cpIndex := i;
+            Break;
+          end;
+        if cpIndex = -1 then
+          Continue;
+
+        cpStr := parts[cpIndex + 1];
+        scoreValue := StrToFloatDef(cpStr, 0) / 100.0;
+
+        if Pos(' pv ', Line) > 0 then
+          pvStr := Trim(Copy(Line, Pos(' pv ', Line) + 4, MaxInt))
+        else
+          pvStr := '';
+
+        ALine.Score := scoreValue;
+        ALine.Moves := pvStr;
+
+        Dict.AddOrSetValue(multiPVNum, ALine);
       end;
     end;
 
-    Result := Res.ToArray;
+    if Dict.Count = 0 then
+    begin
+      SetLength(Result, 0);
+      Exit;
+    end;
+
+    Keys := Dict.Keys.ToArray;
+    TArray.Sort<Integer>(Keys);
+    SetLength(Result, Length(Keys));
+    for j := 0 to High(Keys) do
+      Result[j] := Dict[Keys[j]];
+
   finally
     Lines.Free;
+    Dict.Free;
   end;
 end;
 
 procedure TChess.AnalyzeCurrentPosition;
 var
-  Output: string;
+  Output, Line: string;
   Lines: TArray<TAnalysisLine>;
   i: Integer;
-  StartTime: TDateTime;
 begin
+  if FMoveHistory = '' then
+    Exit;
 
-  // 🔹 Ustaw pozycję i analizę
+  Uci.SendCommand('stop');
+  Uci.SendCommand('isready');
+  repeat
+    Line := Uci.ReadOutput;
+  until Line.Contains('readyok');
+
   Uci.SendCommand('position startpos moves ' + FMoveHistory);
   Uci.SendCommand('setoption name MultiPV value 3');
-  Uci.SendCommand('go depth 10');
+  Uci.SendCommand('go depth 12');
 
-  // 🔹 Zbierz wyjście
   Output := '';
-  StartTime := Now;
   repeat
-    Output := Output + Uci.ReadOutput;
-    Sleep(50);
-  until Output.Contains('bestmove') or (MilliSecondsBetween(Now, StartTime) > 5000);
+    Line := Uci.ReadOutput;
+    if Line <> '' then
+      Output := Output + Line + sLineBreak;
+  until Line.Contains('bestmove');
 
-
-  // 🔹 Parsuj linie
   Lines := ParseMultiPV(Output);
-
-  // 🔹 Wyświetl w gridzie
-  AnalysisGrid.ColCount := 2;
-  AnalysisGrid.RowCount := Length(Lines) + 1;
-  AnalysisGrid.Cells[0, 0] := 'Eval';
-  AnalysisGrid.Cells[1, 0] := 'Line';
-
-  for i := 0 to High(Lines) do
+    if (CurrentMoveIndex mod 2 = 1) then
   begin
-    AnalysisGrid.Cells[0, i + 1] := Format('%.2f', [Lines[i].Score]);
-    AnalysisGrid.Cells[1, i + 1] := Lines[i].Moves;
+    for i := 0 to High(Lines) do
+      Lines[i].Score := -Lines[i].Score;
   end;
-
+  AnalysisGrid.RowCount := 1;
+  if Length(Lines) > 0 then
+  begin
+    AnalysisGrid.RowCount := Length(Lines) + 1;
+    for i := 0 to High(Lines) do
+    begin
+      AnalysisGrid.Cells[0, i + 1] := Format('%.2f', [Lines[i].Score]);
+      AnalysisGrid.Cells[1, i + 1] := Lines[i].Moves;
+    end;
+  end;
 end;
 
 procedure TChess.AnalysisTimerTimer(Sender: TObject);
@@ -3684,43 +3388,52 @@ begin
 end;
 
 procedure TChess.ShowNextMove;
+var
+  MoveUCI: string;
 begin
-if CurrentMoveIndex < MovesList.Count then
+  if CurrentMoveIndex < MovesList.Count then
   begin
-    ApplyMoveFromUCI(MovesList[CurrentMoveIndex]);
+    MoveUCI := MovesList[CurrentMoveIndex];
+    ApplyMoveFromUCI(MoveUCI);
+
+    if FMoveHistory = '' then
+      FMoveHistory := MoveUCI
+    else
+      FMoveHistory := FMoveHistory + ' ' + MoveUCI;
+
     if PromotionFlag then
-     begin
-     PromotionChar:='';
-     PromotionFlag:=false;
-     end;
+    begin
+      PromotionChar := '';
+      PromotionFlag := False;
+    end;
+
     Inc(CurrentMoveIndex);
     LstMoves.ItemIndex := CurrentMoveIndex - 1;
+    AnalyzeCurrentPosition;
   end;
-
-  AnalyzeCurrentPosition;
-
-
 end;
-
 
 procedure TChess.UndoLastMove;
 var
   i: Integer;
 begin
-  if CurrentMoveIndex > 0 then
-    Dec(CurrentMoveIndex);
+  if CurrentMoveIndex = 0 then Exit;
 
-   InitializeState;
+  Dec(CurrentMoveIndex);
+  InitializeState;
+
   FMoveHistory := '';
   for i := 0 to CurrentMoveIndex - 1 do
+  begin
     ApplyMoveFromUCI(MovesList[i]);
-      if FMoveHistory <> '' then
-    FMoveHistory := FMoveHistory + ' ' + MovesList[i]
-  else
-    FMoveHistory := MovesList[i];
+    if FMoveHistory = '' then
+      FMoveHistory := MovesList[i]
+    else
+      FMoveHistory := FMoveHistory + ' ' + MovesList[i];
+  end;
+
   LstMoves.ItemIndex := CurrentMoveIndex;
   AnalyzeCurrentPosition;
-
 end;
 
 

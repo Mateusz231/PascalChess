@@ -46,7 +46,6 @@ begin
   SecAttr.bInheritHandle := True;
   SecAttr.lpSecurityDescriptor := nil;
 
-  // Pipes
   CreatePipe(FStdOutRead, StdOutWrite, @SecAttr, 0);
   SetHandleInformation(FStdOutRead, HANDLE_FLAG_INHERIT, 0);
 

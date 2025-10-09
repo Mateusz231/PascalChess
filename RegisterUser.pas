@@ -98,11 +98,8 @@ begin
   buttonWidth := 130;
   buttonHeight := 40;
   formCenterX := ClientWidth div 2;
-
-  // Start Y offset
   startY := 60;
 
-  // Login label & edit
   LoginLabel.Top := startY;
   LoginLabel.Left := formCenterX - LoginLabel.Width div 2;
 
@@ -111,7 +108,6 @@ begin
   Login.Width := 300;
   Login.Height := fieldHeight;
 
-  // Password label & edit
   PasswordLabel.Top := Login.Top + fieldHeight + spacing;
   PasswordLabel.Left := formCenterX - PasswordLabel.Width div 2;
 
@@ -123,13 +119,11 @@ begin
   PasswordLabel.Font.Style := [fsBold];
   LoginLabel.Font.Style := [fsBold];
 
-
   Password.Top := PasswordLabel.Top + labelHeight + 5;
   Password.Left := formCenterX - 150;
   Password.Width := 300;
   Password.Height := fieldHeight;
 
-  // Buttons
   RegisterButton.Top := Password.Top + fieldHeight + spacing * 2;
   RegisterButton.Left := formCenterX - buttonWidth - spacing div 2;
   RegisterButton.Width := buttonWidth;
@@ -170,7 +164,6 @@ begin
   Exit;
 end;
 
-  // Sprawdü czy login juø istnieje
   FDQuery1.SQL.Clear;
   FDQuery1.SQL.Text := 'SELECT COUNT(*) FROM users WHERE login = :user';
   FDQuery1.ParamByName('user').AsString := LoginStr;
@@ -183,17 +176,11 @@ end;
   end;
 
   FDQuery1.Close;
-
-  // Jeúli nie istnieje ó wstaw nowego uøytkownika
   FDQuery1.SQL.Text := 'INSERT INTO users (login, pass, creation_date, last_modified) VALUES (:login, :pass, :cdate, :lmodified)';
   FDQuery1.ParamByName('login').AsString := LoginStr;
   FDQuery1.ParamByName('pass').AsString := HashedPass;
   FDQuery1.ParamByName('cdate').AsDate := Date;
   FDQuery1.ParamByName('lmodified').AsDateTime := Now;
-
-
-
-
 
   try
     FDQuery1.ExecSQL;

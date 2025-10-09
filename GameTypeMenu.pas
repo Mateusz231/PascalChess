@@ -153,7 +153,6 @@ begin
   PageSize := 10;
   CurrentOffset := 0;
 
-  // --- Nag³ówek z search i przyciskami ---
   PanelHeader := TPanel.Create(Self);
   PanelHeader.Parent := PlayerList;
   PanelHeader.Align := alTop;
@@ -345,14 +344,12 @@ begin
   if MessageDlg(Format('%s invites you to play (%s). Accept?', [FromUser, GameModeName]),
                 mtConfirmation, [mbYes, mbNo], 0) = mrYes then
   begin
-    // najpierw sprawdŸ logowanie
     if not UserSession.Logged then
     begin
       ShowMessage('Currently you are not logged');
       Exit;
     end;
 
-    // wyœlij pe³ny pakiet ACCEPT z loginem i ID
     UserSession.IdTCPClient1.IOHandler.WriteLn(
       Format('INVITE_ACCEPT:%s:%d:%d:%s:%d',
         [ FromUser,                   // zapraszaj¹cy
@@ -365,7 +362,6 @@ begin
   end
   else
   begin
-    // wysy³amy odmowê — tak¿e z trybem gry dla spójnoœci
     UserSession.IdTCPClient1.IOHandler.WriteLn(
       Format('INVITE_DECLINE:%s:%d', [FromUser, GameMode])
     );
@@ -384,7 +380,6 @@ begin
 
   if Cmd = 'INVITED_BY' then
   begin
-    // format: INVITED_BY:Login:Mode
     if Length(Parts) >= 4 then
       ShowInviteDialog(Parts[1],Parts[3],StrToIntDef(Parts[2], 1));
   end
@@ -405,7 +400,6 @@ begin
   end
   else if Cmd = 'INVITE_DECLINED' then
   begin
-    // format: INVITE_DECLINED:Login
     if Length(Parts) >= 2 then
       ShowMessage('User ' + Parts[1] + ' declined your invitation.');
   end
@@ -542,7 +536,6 @@ begin
     end;
   end;
 
-  // Usuñ tylko panele graczy
   PlayerList.DisableAlign;
   try
     for i := PlayerList.ControlCount - 1 downto 0 do
@@ -555,7 +548,6 @@ begin
     PlayerList.EnableAlign;
   end;
 
-  // Dodaj graczy
   for login in ActivePlayers.Keys do
   begin
     var Panel := TPanel.Create(Self);

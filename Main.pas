@@ -176,31 +176,24 @@ procedure TMainMenu.FormResize(Sender: TObject);
 var
   spacing, btnWidth, btnHeight, totalHeight, startY, centerX: Integer;
 begin
-  // Ustawienia przycisków
   spacing := 10;
   btnWidth := 240;
   btnHeight := 80;
-  totalHeight := (btnHeight + spacing) * 4 + btnHeight + 40; // 4 rzêdy + Exit + label
+  totalHeight := (btnHeight + spacing) * 4 + btnHeight + 40;
 
   centerX := ClientWidth div 2;
-
-  // Ustaw label na œrodku
   Label1.Left := (ClientWidth - Label1.Width) div 2;
   Label1.Top := 40;
 
-  // Przycisk Play
   Button1.SetBounds(centerX - btnWidth - spacing div 2, Label1.Top + 60, btnWidth, btnHeight);
   Button6.SetBounds(centerX + spacing div 2, Label1.Top + 60, btnWidth, btnHeight);
 
-  // Your Profile & Register
   Button2.SetBounds(Button1.Left, Button1.Top + btnHeight + spacing, btnWidth, btnHeight);
   Button7.SetBounds(Button6.Left, Button2.Top, btnWidth, btnHeight);
 
-  // Leaderboards & History
   Button4.SetBounds(Button1.Left, Button2.Top + btnHeight + spacing, btnWidth, btnHeight);
   Button3.SetBounds(Button6.Left, Button4.Top, btnWidth, btnHeight);
 
-  // Exit — na œrodku
   Button5.SetBounds(centerX - btnWidth div 2, Button4.Top + btnHeight + spacing + 10, btnWidth, btnHeight);
 end;
 
@@ -208,14 +201,10 @@ end;
 
 procedure TMainMenu.LogoutButtonClick(Sender: TObject);
 begin
-
-
 UserSession.Logout;
 ShowMessage('Wylogowano');
 LogoutButton.Visible:= false;
 Button6.Visible:= true;
-
-
 
 end;
 

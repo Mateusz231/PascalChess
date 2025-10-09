@@ -66,10 +66,6 @@ Begin
   Color := clBlack;
   Font.Color := clWhite;
   Font.Size := 10;
-
-
-
-
   tsgrid.Parent := Self;
   tsgrid.Color := clBlack;
   tsgrid.Font.Color := clWhite;
@@ -95,6 +91,7 @@ Begin
   LoadMatchHistory;
 end;
 
+
 procedure TMatchHistoryForm.SetupGrid;
 begin
   tsgrid.RowCount := RecordsPerPage + 1;
@@ -106,6 +103,7 @@ begin
   tsgrid.Cells[3, 0] := 'Date';
   tsgrid.Cells[4,0] := 'Analyze';
 end;
+
 
 procedure TMatchHistoryForm.LoadMatchHistory;
 var
@@ -153,7 +151,6 @@ begin
     Exit;
   end;
 
-  // Czyść stare dane
   for i := 1 to tsgrid.RowCount - 1 do
   begin
 
@@ -173,7 +170,6 @@ begin
     tsgrid.Cells[1, i] := FDQuery1.FieldByName('opponent_login').AsString;
     tsgrid.Cells[2, i] := FDQuery1.FieldByName('outcome').AsString;
     tsgrid.Cells[3, i] := FDQuery1.FieldByName('date').AsString;
-   // tsgrid.Objects[4,i]:= TObject(FDQuery1.FieldByName('gameid').AsInteger);
     var GameInfo:=TGameInfo.Create;
     GameInfo.GameId:= FdQuery1.FieldByName('gameid').AsInteger;
     GameInfo.Opponent:= FDQuery1.FieldByName('opponent_login').AsString;
@@ -187,10 +183,6 @@ begin
 end;
 
 
-
-
-
-
 procedure TMatchHistoryForm.BtnPrevPageClick(Sender: TObject);
 begin
   if FPage > 0 then
@@ -199,6 +191,7 @@ begin
     LoadMatchHistory;
   end;
 end;
+
 
 procedure TMatchHistoryForm.BtnNextPageClick(Sender: TObject);
 begin
@@ -219,7 +212,6 @@ begin
 end;
 
 
-
 procedure TMatchHistoryForm.tsgridClick(Sender: TObject);
 var
   col, row: Integer;
@@ -228,32 +220,20 @@ begin
   col := tsgrid.Col;
   row := tsgrid.Row;
 
-
-
   if (row > 0) and (col = 4) then
   begin
     if Assigned(tsgrid.Objects[col, row]) then
     begin
       GameInfo := TGameInfo(tsgrid.Objects[col, row]);
-
-      // teraz masz oba
-     // ShowMessage(Format('GameID=%d, Opponent=%s',
-       // [GameInfo.GameID, GameInfo.Opponent]));
-
-
-        Self.Hide;
-        Chess := TChess.Create(nil);
-        Chess.SetGameType(5);
-        Chess.OnClose := ChessCloseHandler;
-        Chess.LoadGameFromDB(GameInfo.GameID, GameInfo.Opponent);
-        Chess.Show;
-
-
+      Self.Hide;
+      Chess := TChess.Create(nil);
+      Chess.SetGameType(5);
+      Chess.OnClose := ChessCloseHandler;
+      Chess.LoadGameFromDB(GameInfo.GameID, GameInfo.Opponent);
+      Chess.Show;
     end;
   end;
 end;
-
-
 
 
 procedure TMatchHistoryForm.tsgridDrawCell(Sender: TObject; ACol, ARow: Integer;
@@ -276,6 +256,7 @@ begin
   end;
 end;
 
+
 procedure TMatchHistoryForm.FormResize(Sender: TObject);
 var
   nonClient: Integer;
@@ -283,15 +264,10 @@ begin
   tsgrid.DefaultRowHeight := 28;
   tsgrid.RowCount := RecordsPerPage + 1; // 15 danych + nagłówek
 
-  // oblicz non-client (ramki)
   nonClient := tsgrid.Height - tsgrid.ClientHeight;
   if nonClient < 0 then
     nonClient := 0;
-
-  // ustaw dokładną wysokość: wszystkie wiersze * wysokość + ramka
   tsgrid.Height := (tsgrid.RowCount * tsgrid.DefaultRowHeight) + nonClient;
-
-  // pozycjonowanie reszty
   tsgrid.Left := 20;
   tsgrid.Top := 50;
   tsgrid.Width := ClientWidth - 40;
@@ -304,18 +280,16 @@ begin
   BackButton.Left:= 20;
   LblPageInfo.Left := ClientWidth - 120;
   LblPageInfo.Top := 20;
-
-
-
-
   ResizeGridColumns;
 end;
+
 
 procedure TMatchHistoryForm.FormShow(Sender: TObject);
 begin
   LoadMatchHistory;
   Resize;
 end;
+
 
 procedure TMatchHistoryForm.ResizeGridColumns;
 var
@@ -324,9 +298,9 @@ begin
   if tsgrid.ColCount = 5 then
   begin
     TotalWidth := tsgrid.ClientWidth;
-    tsgrid.ColWidths[0] := TotalWidth div 10;           // Lp.
-    tsgrid.ColWidths[1] := (TotalWidth * 4) div 10;     // Opponent
-    tsgrid.ColWidths[2] := (TotalWidth * 2) div 10;     // Result  s
+    tsgrid.ColWidths[0] := TotalWidth div 10;
+    tsgrid.ColWidths[1] := (TotalWidth * 4) div 10;
+    tsgrid.ColWidths[2] := (TotalWidth * 2) div 10;
     tsgrid.ColWidths[3] := (TotalWidth * 2) div 10;
     tsgrid.ColWidths[4] := (TotalWidth * 1) div 10;
   end;
@@ -339,6 +313,7 @@ begin
   Self.Hide;
   Application.MainForm.Show;
 end;
+
 
 procedure TMatchHistoryForm.FormClose(Sender: TObject; var Action: TCloseAction);
 

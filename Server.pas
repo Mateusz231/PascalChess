@@ -83,7 +83,7 @@ type
 
 
   public
-    { Publiczne metody – brak }
+
   end;
 
 var
@@ -103,7 +103,6 @@ const
   BulletIncrement = 1;
 
 
-{ Loguje komunikaty w TMemo bezpiecznie z każdego wątku }
 procedure TForm10.Log(const Msg: string);
 begin
   TThread.Queue(nil,
@@ -122,7 +121,7 @@ begin
   Application.title:='Server';
 
   sgPlayers.ColCount   := 2;
-  sgPlayers.RowCount   := 2;     // tylko nagłówek
+  sgPlayers.RowCount   := 2;
   sgPlayers.FixedCols  := 0;
   sgPlayers.FixedRows  := 1;
   sgPlayers.Options    := sgPlayers.Options + [goRowSelect, goColSizing];
@@ -131,9 +130,6 @@ begin
   sgPlayers.ColWidths[0] := 150;
   sgPlayers.ColWidths[1] := 60;
 
-
-
-  // Tworzymy listy i sekcję krytyczną
   WaitingRapid  := TList<TPlayerInfo>.Create;
   WaitingBlitz  := TList<TPlayerInfo>.Create;
   WaitingBullet := TList<TPlayerInfo>.Create;
@@ -142,11 +138,9 @@ begin
   ActivePlayers:= TDictionary<string, boolean>.Create();
   ContextToLogin:= TDictionary<TidContext, string>.Create();
 
-  // Ustawienia MemoLog
   MemoLog.Clear;
   Log('Server startuje...');
 
-  // Ustawienia serwera TCP
   IdTCPServer1.DefaultPort := 5000;
   IdTCPServer1.OnConnect    := IdTCPServer1Connect;
   IdTCPServer1.OnDisconnect := IdTCPServer1Disconnect;
@@ -157,7 +151,6 @@ end;
 
 procedure TForm10.FormDestroy(Sender: TObject);
 begin
-  // Sprzątamy
   IdTCPServer1.Active := False;
   ListLock.Free;
   WaitingRapid.Free;
@@ -193,7 +186,6 @@ begin
 
   else
   begin
-    // Jeśli tutaj wpadniesz, to znaczy, że nigdy nie mapowałeś tego kontekstu
     Log('Nieznany kontekst rozłączony (brak loginu)');
   end;
 
@@ -213,7 +205,7 @@ begin
   ListLock.Acquire;
 
   try
-    // Szukamy pary zawierającej tego gracza
+
     for i := ActivePairs.Count - 1 downto 0 do
     begin
       Pair := ActivePairs[i];
@@ -244,11 +236,8 @@ begin
 
         end;
 
-
-        // Usuwamy parę z listy
         ActivePairs.Delete(i);
 
-        // Informujemy przeciwnika
         if (Opponent <> nil) and Opponent.Connection.Connected then
         begin
           Opponent.Connection.IOHandler.WriteLn('OPPONENT_LEFT');
@@ -284,11 +273,8 @@ begin
 
       if (Pair.WhitePlayer = AContext) or (Pair.BlackPlayer = AContext) then
       begin
-        // oznacz graczy jako wolnych
         ActivePlayers[Pair.WhiteLogin] := False;
         ActivePlayers[Pair.BlackLogin] := False;
-
-        // usuń parę z listy
         ActivePairs.Delete(i);
         Break;
       end;
@@ -349,10 +335,9 @@ end;
 
 procedure TForm10.SaveRankingToDB(const Pair: TPlayerPair);
 begin
-  // Zrób kopię rekordu, żeby anonimowa metoda miała własny snapshot
+
   var LocalPair := Pair;
 
-  // Uruchamiamy zapis w tle — nie blokuje wątku klienta
   TTask.Run(procedure
   var
     Conn: TFDConnection;
@@ -363,21 +348,16 @@ begin
       Conn := TFDConnection.Create(nil);
       Q := nil;
       try
-        // Skopiuj parametry połączenia z głównego FDConnection1
-        // (upewnij się, że FDConnection1 ma ustawione Params/DriverName poprawnie)
         Conn.Params.Assign(FDConnection1.Params);
         Conn.DriverName := FDConnection1.DriverName;
         Conn.LoginPrompt := False;
-
-        // jeśli używasz FDPhysMySQLDriverLink1.VendorLib, to ścieżka jest już ustawiona w FormCreate
-        // podłącz się
         try
           Conn.Connected := True;
         except
           on E: Exception do
           begin
             Log('DB connect error in SaveRankingToDBAsync: ' + E.ClassName + ': ' + E.Message);
-            Exit; // nie można połączyć -> wyjście z taska
+            Exit;
           end;
         end;
 
@@ -411,7 +391,6 @@ begin
           on E: Exception do
           begin
             Log('DB exec error (white) SaveRankingToDBAsync: ' + E.ClassName + ': ' + E.Message);
-            // nie przerywamy taska, spróbujemy drugiego update dalej
           end;
         end;
 
@@ -434,7 +413,6 @@ begin
             Log('DB exec error (black) SaveRankingToDBAsync: ' + E.ClassName + ': ' + E.Message);
         end;
 
-        // jeśli chcesz, możesz tu jeszcze zapisać log / wynik
         Log(Format('Saved ranking async: W:%d B:%d (userids %d/%d)',
           [LocalPair.WhiteRanking, LocalPair.BlackRanking, LocalPair.WhiteID, LocalPair.BlackID]));
       finally
@@ -470,13 +448,11 @@ begin
     Pair := ActivePairs[idx];
 
     // --- obliczenia Elo ---
-    K := 32; // współczynnik – można zmieniać wg potrzeb
+    K := 32;
 
-    // oczekiwane wyniki
     Ewhite := 1 / (1 + Power(10, (Pair.BlackRanking - Pair.WhiteRanking) / 400));
     Eblack := 1 / (1 + Power(10, (Pair.WhiteRanking - Pair.BlackRanking) / 400));
 
-    // faktyczny wynik
     if Pair.Result = 'WHITE' then
     begin
       Swhite := 1.0;
@@ -493,17 +469,12 @@ begin
       Sblack := 0.5;
     end;
 
-    // nowe rankingi
     NewWhite := Round(Pair.WhiteRanking + K * (Swhite - Ewhite));
     NewBlack := Round(Pair.BlackRanking + K * (Sblack - Eblack));
 
     Pair.WhiteRanking := NewWhite;
     Pair.BlackRanking := NewBlack;
 
-    // jeśli chcesz np. zwiększać licznik rozegranych partii,
-    // możesz tu dodać pola w Pair i je aktualizować.
-
-    // nadpisujemy zmodyfikowany rekord w liście
     ActivePairs[idx] := Pair;
   finally
     ListLock.Release;
@@ -555,7 +526,6 @@ var
 begin
   if (InviterCtx = nil) or (AccepterCtx = nil) then Exit;
 
-  // pobierz loginy
   if not ContextToLogin.TryGetValue(InviterCtx, InviterLogin) then Exit;
   if not ContextToLogin.TryGetValue(AccepterCtx, AccepterLogin) then Exit;
 
@@ -564,7 +534,6 @@ begin
     QueueLeft(InviterCtx);
     QueueLeft(AccepterCtx);
 
-    // losowo kolory
     if Random(2) = 0 then
     begin
       Pair.WhitePlayer := InviterCtx;
@@ -586,7 +555,6 @@ begin
       Pair.BlackID     := InviterID;
     end;
 
-    // czasy wg trybu
     case GameTypeId of
       1: begin Pair.WhiteSeconds := RapidTime; Pair.BlackSeconds := RapidTime; Pair.IncrementSeconds := RapidIncrement; end;
       2: begin Pair.WhiteSeconds := BlitzTime; Pair.BlackSeconds := BlitzTime; Pair.IncrementSeconds := BlitzIncrement; end;
@@ -638,7 +606,6 @@ begin
 
     if P1.ID = P2.ID then
     begin
-  // jeśli to ten sam użytkownik dwa razy, odłóż drugi wpis na koniec listy
     WaitingRapid.Add(P2);
     Exit;
      end;
@@ -648,7 +615,6 @@ begin
     WaitingRapid.Delete(1);
     WaitingRapid.Delete(0);
 
-    // losowo biały/czarny
     if Random(2)=0 then
     begin
       Pair.WhitePlayer := P1.Context; Pair.WhiteLogin := P1.Login; Pair.WhiteID := P1.ID;
@@ -662,7 +628,6 @@ begin
       ActivePlayers[P1.Login] := True;
       ActivePlayers[P2.Login] := True;
     end;
-     // **Ustawiamy czasy PRZED** dodaniem do listy
     Pair.WhiteSeconds     := RapidTime;
     Pair.BlackSeconds     := RapidTime;
     Pair.IncrementSeconds := RapidIncrement;
@@ -713,7 +678,6 @@ begin
 
    if P1.ID = P2.ID then
    begin
-  // jeśli to ten sam użytkownik dwa razy, odłóż drugi wpis na koniec listy
     WaitingBlitz.Add(P2);
     Exit;
    end;
@@ -735,7 +699,6 @@ begin
       ActivePlayers[P2.Login] := True;
     end;
 
-     // **Ustawiamy czasy PRZED** dodaniem do listy
     Pair.WhiteSeconds     := BlitzTime;
     Pair.BlackSeconds     := BlitzTime;
     Pair.IncrementSeconds := BlitzIncrement;
@@ -779,7 +742,6 @@ begin
 
     if P1.ID = P2.ID then
     begin
-  // jeśli to ten sam użytkownik dwa razy, odłóż drugi wpis na koniec listy
     WaitingBullet.Add(P2);
     Exit;
    end;
@@ -803,7 +765,6 @@ begin
 
     RefreshPlayerGrid;
 
-     // **Ustawiamy czasy PRZED** dodaniem do listy
     Pair.WhiteSeconds     := BulletTime;
     Pair.BlackSeconds     := BulletTime;
     Pair.IncrementSeconds := BulletIncrement;
@@ -862,8 +823,6 @@ begin
   finally
     ListLock.Release;
   end;
-
-  // Jeśli nie znaleziono, zwracamy "pustą" parę
   Result.WhitePlayer := nil;
   Result.BlackPlayer := nil;
 end;
@@ -883,8 +842,6 @@ begin
   end;
 end;
 
-
-/// Wysyła ruch do przeciwnika, dodając prefix OPPONENT_MOVE:
 procedure TForm10.BroadcastToOpponent(SenderClient: TIdContext; const Msg: string);
 var
   Pair: TPlayerPair;
@@ -913,7 +870,6 @@ begin
   Pair := FindPairWithPlayer(SenderClient);
   if Pair.WhitePlayer = nil then Exit;
 
-  // Jeśli to biały wysłał PROMO ➜ do czarnego i odwrotnie
   if SenderClient = Pair.WhitePlayer then
     Pair.BlackPlayer.Connection.IOHandler.WriteLn('OPPONENT_PROMO:' + Msg)
   else
@@ -1010,18 +966,17 @@ end;
 
 
 
-
 procedure TForm10.BroadcastEndgame(SenderClient: TIdContext; const Msg: string);
 var
   idx : Integer;
   Pair: TPlayerPair;
 begin
-  idx := FindPairIndex(SenderClient);  // funkcja zwraca indeks w ActivePairs
+  idx := FindPairIndex(SenderClient);
   if idx = -1 then Exit;
 
   ListLock.Acquire;
   try
-    Pair := ActivePairs[idx];  // kopiujemy z listy
+    Pair := ActivePairs[idx];
 
     if Msg = 'WIN' then
     begin
@@ -1064,7 +1019,7 @@ begin
     ActivePlayers[Pair.BlackLogin] := False;
     ActivePlayers[Pair.WhiteLogin] := False;
 
-    ActivePairs[idx] := Pair;  // <- nadpisujemy zmodyfikowany rekord
+    ActivePairs[idx] := Pair;
   finally
     ListLock.Release;
   end;
@@ -1085,12 +1040,12 @@ begin
 
   ListLock.Acquire;
   try
-    Pair := ActivePairs[idx];  // kopiujemy
+    Pair := ActivePairs[idx];
     if SenderClient = Pair.WhitePlayer then
       Pair.BlackRanking := StrToInt(Ranking)
     else
       Pair.WhiteRanking := StrToInt(Ranking);
-    ActivePairs[idx] := Pair;  // nadpisujemy całość
+    ActivePairs[idx] := Pair;
   finally
     ListLock.Release;
   end;
@@ -1109,7 +1064,6 @@ var
   tcp: string;
 begin
 
-  // 1) Odczyt pierwszej linii: LOGIN
   Msg := AContext.Connection.IOHandler.ReadLn;
   Log('Odebrano od ' + AContext.Binding.PeerIP + ': ' + Msg);
 
@@ -1118,27 +1072,25 @@ begin
     if Msg.StartsWith('TIME:') then
   begin
     var i: Integer;
-    // 1. wyciągamy liczbę sekund
+
     Elapsed := StrToIntDef(Msg.Substring(5), 0);
 
-    // 2. znajdujemy parę
     for i := 0 to ActivePairs.Count-1 do
       with ActivePairs[i] do
         if (WhitePlayer = AContext) or (BlackPlayer = AContext) then
         begin
           PairRec := ActivePairs[i];
           IsWhite := (AContext = WhitePlayer);
-          // 3. odejmij od właściwego licznika
+
           if IsWhite then
             PairRec.WhiteSeconds := PairRec.WhiteSeconds - Elapsed+PairRec.IncrementSeconds
           else
             PairRec.BlackSeconds := PairRec.BlackSeconds - Elapsed+PairRec.IncrementSeconds;
-          // 4. nadpisz z powrotem
+
           ActivePairs[i] := PairRec;
           Break;
         end;
 
-    // 5. rozsyłamy nowy stan czasu
     tcp := Format('TIME_UPDATE:WHITE=%d|BLACK=%d',
                   [PairRec.WhiteSeconds, PairRec.BlackSeconds]);
     PairRec.WhitePlayer.Connection.IOHandler.WriteLn(tcp);
@@ -1150,7 +1102,6 @@ begin
 
   if Msg.StartsWith('CHAT:') then
   begin
-    // Msg.Substring(5) to czysta treść wiadomości
     BroadcastChat(AContext, Msg.Substring(5).Trim);
     Exit;
   end;
@@ -1166,7 +1117,7 @@ begin
   var Filter := '';
   var Flag:='';
 
-  // Parsowanie parametrów
+
   if Length(Parts) >= 3 then
   begin
     Offset := StrToIntDef(Parts[1], 0);
@@ -1179,23 +1130,20 @@ begin
   var CountSent := 0;
   var Index     := 0;
 
-  // sortowanie – np. alfabetycznie
   TArray.Sort<string>(AllLogins);
 
   for var Login in AllLogins do
   begin
-    // filtr nazwy
+
     if (Filter <> '') and (Pos(Filter, LowerCase(Login)) = 0) then
       Continue;
 
-    // pomiń do offsetu
     if Index < Offset then
     begin
       Inc(Index);
       Continue;
     end;
 
-    // limit 10 rekordów
     if CountSent >= Limit then
       Break;
 
@@ -1214,7 +1162,6 @@ begin
     Inc(Index);
   end;
 
-  // sygnał końca listy
   AContext.Connection.IOHandler.WriteLn('');
   Exit;
 end;
@@ -1236,11 +1183,9 @@ begin
       var IsIdle: Boolean;
       if (TargetCtx <> nil) and ActivePlayers.TryGetValue(TargetLogin, IsIdle) and (IsIdle = False) then
       begin
-        // usuwamy z kolejek (żeby nie trafiło do auto-parowania)
         QueueLeft(AContext);
         QueueLeft(TargetCtx);
 
-        // powiadom adresata (kto go zaprasza + tryb gry + ID)
         TargetCtx.Connection.IOHandler.WriteLn(
           'INVITED_BY:' + SourceLogin + ':' + IntToStr(Mode2) + ':' + IntToStr(SourceID)
         );
@@ -1274,14 +1219,11 @@ begin
     var InviterCtx := FindContextByLogin(InviterLogin);
     if Assigned(InviterCtx) then
     begin
-      // powiadom zapraszającego, że zaakceptowano
+
       InviterCtx.Connection.IOHandler.WriteLn(
         'INVITE_ACCEPTED:' + AccepterLogin + ':' + IntToStr(Mode2)
       );
-
       AContext.Connection.IOHandler.WriteLn('INVITE_ACCEPTED:' + InviterLogin + ':' + IntToStr(Mode2));
-
-      // start gry: InviterCtx = zapraszający, AContext = akceptujący
       StartManualGame(InviterCtx, AContext, Mode2, InviterID, AccepterID);
     end
     else
@@ -1296,7 +1238,7 @@ end;
 if Msg.StartsWith('INVITE_DECLINE:') then
 begin
   var Parts := Msg.Split([':']);
-  if Length(Parts) >= 2 then   // tylko nadawca jest potrzebny
+  if Length(Parts) >= 2 then
   begin
     var SourceLogin := Parts[1];
     var SourceCtx := FindContextByLogin(SourceLogin);
@@ -1304,7 +1246,6 @@ begin
       SourceCtx.Connection.IOHandler.WriteLn(
         'INVITE_DECLINED:' + ContextToLogin[AContext]);
 
-    // odblokuj obu graczy (wracają jako wolni)
     ListLock.Acquire;
     try
       var declLogin := '';
@@ -1325,18 +1266,13 @@ begin
   Exit;
 end;
 
-
-
-
-  // Dodaj gracza do słownika (jeszcze nie w grze)
   if Msg.StartsWith('ADDPLAYER:') then
   begin
   var user := Msg.Substring(10);
   if not ActivePlayers.ContainsKey(user) then
   ActivePlayers.Add(user, False);
   ContextToLogin.Add(Acontext,user);
-  //AContext.Connection.IOHandler.WriteLn('OK');
-    RefreshPlayerGrid;
+  RefreshPlayerGrid;
   Exit;
 
   end;
@@ -1348,7 +1284,6 @@ end;
   Exit;
   end;
 
-// Usuń gracza (logout/rozłączenie)
   if Msg.StartsWith('REMOVEPLAYER:') then
   begin
   ActivePlayers.Remove(Msg.Substring(13));
@@ -1358,7 +1293,6 @@ end;
   Exit;
   end;
 
-// Sprawdź, czy zalogowany
   if Msg.StartsWith('ISLOGGED:') then
   begin
   if ActivePlayers.ContainsKey(Msg.Substring(9)) then
@@ -1381,12 +1315,9 @@ end;
 
   if Msg.StartsWith('LOGIN:') then
   begin
-
-    // parsujemy login
     Info.Context := AContext;
     Info.Login   := Msg.Substring(6);
 
-    // 2) Odczyt ID
     Msg := AContext.Connection.IOHandler.ReadLn;
     Log('Odebrano: ' + Msg);
     if not Msg.StartsWith('ID:') then
@@ -1396,7 +1327,6 @@ end;
     end;
     Info.ID := StrToIntDef(Msg.Substring(3), 0);
 
-    // 3) Odczyt MODE
     Msg := AContext.Connection.IOHandler.ReadLn;
     Log('Odebrano: ' + Msg);
     if not Msg.StartsWith('MODE:') then
@@ -1404,14 +1334,12 @@ end;
       Log('Błędny protokół – oczekiwano MODE:, dostałem: ' + Msg);
       Exit;
     end;
-    mode := UpperCase(Msg.Substring(5)); // bez spacji
+    mode := UpperCase(Msg.Substring(5));
 
-    // 4) Dodajemy do odpowiedniej kolejki
     ListLock.Acquire;
     try
       if mode = '1' then
       begin
-      // tylko jedno wystąpienie danego gracza w kolejce
 
        var found := False;
       for var i := 0 to WaitingRapid.Count - 1 do
@@ -1466,8 +1394,6 @@ end;
       ListLock.Release;
     end;
 
-
-    // 5) Próbujemy od razu parować w tej kolejce
     if mode = '1' then
       TryPairRapid
     else if mode = '2' then
@@ -1478,12 +1404,9 @@ end;
     Exit;
   end;
 
-  // 6) Jeśli nie był to LOGIN, to sprawdzamy czy jest w parze
   if not IsPlayerPaired(AContext) then
-    Exit;
-
-  // 7) Wysłanie dalej ruchów, promocji, zakończenia gry
-  Msg := Msg.Trim; // może mieć pozostałe spacje
+  Exit;
+  Msg := Msg.Trim;
   if Msg.StartsWith('PROMO:') then
     BroadcastPromotion(AContext, Msg.Substring(6))
 
@@ -1557,15 +1480,8 @@ end;
   RemovePair(AContext);
   end
 
-
-
-
   else
     BroadcastToOpponent(AContext, Msg);
-
-
-
-
 
 end;
 
@@ -1577,7 +1493,6 @@ var
   row: Integer;
   keys: TArray<string>;
 begin
-  // Wywołaj zawsze w głównym wątku
   if not TThread.CheckTerminated then
     TThread.Queue(nil,
       procedure
@@ -1585,11 +1500,8 @@ begin
         ListLock.Acquire;
         try
 
-          // Zbierz wszystkie loginy
           keys := ActivePlayers.Keys.ToArray;
-          // Ustaw liczbę wierszy (nagłówek + rekordy)
           sgPlayers.RowCount := Length(keys) + 1;
-          // Wypełnij wiersze
           for var i := 0 to High(keys) do
           begin
             row := i + 1;
@@ -1604,7 +1516,6 @@ begin
             sgPlayers.Cells[1,row]:='NO';
             end;
 
-            //sgPlayers.Cells[1, row] := IfThen(ActivePlayers[keys[i]], 'YES', 'NO');
           end;
         finally
           ListLock.Release;
@@ -1612,14 +1523,6 @@ begin
       end
     );
 end;
-
-
-
-
-
-
-
-
 
 
 

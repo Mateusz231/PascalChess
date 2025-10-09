@@ -23,7 +23,6 @@ type
     ValueLastname: TLabel;
     ValueCountry: TLabel;
     ValueCreationDate: TLabel;
-
     LabelRapid: TLabel;
     LabelBlitz: TLabel;
     LabelBullet: TLabel;
@@ -73,7 +72,7 @@ procedure TProfile.FormCreate(Sender: TObject);
 begin
  FDPhysMySQLDriverLink1.VendorLib := ExtractFilePath(Application.ExeName) + 'libmysql.dll';
  FDConnection1.Connected := False;
-  Color := $00202020; // ciemnoszare t³o
+  Color := $00202020;
   Font.Name := 'Segoe UI';
   Font.Size := 10;
   SetupPanels;
@@ -88,14 +87,11 @@ begin
   PanelProfile.Color := $00303030;
   PanelProfile.BevelOuter := bvNone;
   PanelProfile.SetBounds(50, 50, ClientWidth - 100, 250);
-
   PanelRatings := TPanel.Create(Self);
   PanelRatings.Parent := Self;
   PanelRatings.Color := $00303030;
   PanelRatings.BevelOuter := bvNone;
   PanelRatings.SetBounds(50, PanelProfile.Top + PanelProfile.Height + 20, ClientWidth - 100, 140);
-
-  // Przypisanie Parent dla labeli
   LabelLogin.Parent := PanelProfile;
   ValueLogin.Parent := PanelProfile;
   LabelFirstname.Parent := PanelProfile;
@@ -144,25 +140,19 @@ begin
     AllLabels[i].Transparent := True;
   end;
 
-
-
-   LabelLogin.Caption := 'Login:';
+  LabelLogin.Caption := 'Login:';
   LabelFirstname.Caption := 'Name:';
   LabelLastname.Caption := 'Lastname:';
   LabelCountry.Caption := 'Country:';
   LabelCreationDate.Caption := 'Account creation date: ';
-
-
   EditButton.Caption := 'Edytuj';
   SaveButton.Caption := 'Zapisz';
-
- // EditButton.Color := $004080FF; // niebieski
- // SaveButton.Color := $004080FF;
   EditButton.Font.Color := clWhite;
   SaveButton.Font.Color := clWhite;
   EditButton.Font.Style := [fsBold];
   SaveButton.Font.Style := [fsBold];
 end;
+
 
 procedure TProfile.LoadProfileData;
 var
@@ -211,6 +201,7 @@ begin
   end;
 end;
 
+
 procedure TProfile.SetEditMode(AEditing: Boolean);
 begin
   EditFirstname.Visible := AEditing;
@@ -226,33 +217,30 @@ begin
 
   if AEditing then
   begin
-  //  ValueFirstname.Caption:= 'aaaaa';
     EditFirstname.Text := ValueFirstname.Caption;
     EditLastname.Text := ValueLastname.Caption;
     EditCountry.Text := ValueCountry.Caption;
   end;
 end;
 
+
 procedure TProfile.EditButtonClick(Sender: TObject);
 begin
   SetEditMode(True);
 end;
 
+
 procedure TProfile.SaveButtonClick(Sender: TObject);
 var
 Query: TFDQuery;
 begin
-
-
-
-
   ValueFirstname.Caption := EditFirstname.Text;
   ValueLastname.Caption := EditLastname.Text;
   ValueCountry.Caption := EditCountry.Text;
 
    Query := TFDQuery.Create(nil);
   try
-    Query.Connection := FDConnection1; // <- tutaj wstaw swoj¹ zmienn¹ po³¹czenia!
+    Query.Connection := FDConnection1;
 
     Query.SQL.Text :=
   'UPDATE users ' +
@@ -269,8 +257,7 @@ begin
     Query.ParamByName('country').AsString   := EditCountry.Text;
     Query.ParamByName('last_modified').AsDateTime:= Now;
     Query.ParamByName('who_modified').AsInteger := UserSession.LoggedUserID;
-    Query.ParamByName('userid').AsInteger        := UserSession.LoggedUserID; // <- tutaj Twoje ID u¿ytkownika
-
+    Query.ParamByName('userid').AsInteger        := UserSession.LoggedUserID;
     Query.ExecSQL;
   finally
     Query.Free;
@@ -317,6 +304,7 @@ begin
   EditButton.SetBounds(ClientWidth div 2 - 100, PanelRatings.Top + PanelRatings.Height + 20, 80, 40);
   SaveButton.SetBounds(ClientWidth div 2 + 20, PanelRatings.Top + PanelRatings.Height + 20, 80, 40);
 end;
+
 
 procedure TProfile.FormShow(Sender: TObject);
 begin
