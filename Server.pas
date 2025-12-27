@@ -45,37 +45,34 @@ type
     procedure FormDestroy(Sender: TObject);
     procedure IdTCPServer1Execute(AContext: TIdContext);
     procedure IdTCPServer1Connect(AContext: TIdContext);
-  private
+    private
     WaitingRapid, WaitingBlitz, WaitingBullet: TList<TPlayerInfo>;
     ActivePairs: TList<TPlayerPair>;
     ListLock: TCriticalSection;
     ActivePlayers: TDictionary<string, boolean>;
     ContextToLogin: TDictionary<TIdContext,string>;
 
-    procedure TryPairRapid;
-    procedure TryPairBlitz;
-    procedure TryPairBullet;
     function FindPairWithPlayer(Player: TIdContext): TPlayerPair;
     function IsPlayerPaired(Player: TIdContext): Boolean;
     function FindPairIndex(Player: TIdContext): Integer;
-    procedure BroadcastToOpponent(SenderClient: TIdContext; const Msg: string);
-    procedure BroadcastPromotion(SenderClient: TIdContext; const Msg: string);
+    function FindContextByLogin(const Login: string): TIdContext;
+    function GetContextUserID(AContext: TIdContext): Integer;
+
+    procedure TryPairRapid;
+    procedure TryPairBlitz;
+    procedure TryPairBullet;
     procedure Log(const Msg: string);
     procedure BroadcastEndgame(SenderClient: TIdContext; const Msg: string);
     procedure BroadcastChat(SenderClient: TIdContext; const Text: string);
-    procedure BroadcastSan(SenderClient: TIdContext; const Msg: string);
     procedure RefreshPlayerGrid;
     procedure OnPlayerLeft(AContext: TidContext);
     procedure IdTCPServer1Disconnect(AContexT: TIdContext);
     procedure QueueLeft(AContext: TIdContext);
-    procedure BroadcastDrawOffer(SenderClient: TIdContext);
-    procedure BroadcastCustom(SenderClient: TIdContext; const Msg: string);
+    procedure BroadcastCustom(SenderClient: TIdContext; const Msg: string; const Extra: string = '');
     procedure SendSQL(SenderClient: TIdContext; const SQL: string; OpString: string);
     procedure HandleRanking(SenderClient: TIdContext; const Ranking: string);
     procedure UpdateRanking(SenderClient: TIdContext; const Msg: string);
     procedure SaveRankingToDB(const Pair: TPlayerPair);
-    function FindContextByLogin(const Login: string): TIdContext;
-    function GetContextUserID(AContext: TIdContext): Integer;
     procedure StartManualGame(InviterCtx, AccepterCtx: TIdContext;
     GameTypeId, InviterID, AccepterID: Integer);
     procedure RemovePair(AContext: TIdContext);
@@ -241,6 +238,7 @@ begin
         if (Opponent <> nil) and Opponent.Connection.Connected then
         begin
           Opponent.Connection.IOHandler.WriteLn('OPPONENT_LEFT');
+         // Opponent.Connection.IOHandler.WriteLn('PGN:');
           Log('Wysłano do przeciwnika: OPPONENT_LEFT');
         end;
 
@@ -262,33 +260,38 @@ end;
 
 procedure TForm10.RemovePair(AContext: TIdContext);
 var
-  i: Integer;
+  idx: Integer;
   Pair: TPlayerPair;
 begin
+  if (AContext = nil) or (ActivePairs = nil) or (ActivePlayers = nil) then
+    Exit;
+
+  idx := FindPairIndex(AContext);
+  if (idx = -1) or (idx >= ActivePairs.Count) then
+    Exit;
+
   ListLock.Acquire;
   try
-    for i := ActivePairs.Count - 1 downto 0 do
-    begin
-      Pair := ActivePairs[i];
+    Pair := ActivePairs[idx];
 
-      if (Pair.WhitePlayer = AContext) or (Pair.BlackPlayer = AContext) then
-      begin
+    try
+      if (Pair.WhiteLogin <> '') and ActivePlayers.ContainsKey(Pair.WhiteLogin) then
         ActivePlayers[Pair.WhiteLogin] := False;
+
+      if (Pair.BlackLogin <> '') and ActivePlayers.ContainsKey(Pair.BlackLogin) then
         ActivePlayers[Pair.BlackLogin] := False;
-        ActivePairs.Delete(i);
-        Break;
-      end;
+
+      ActivePairs.Delete(idx);
+      Log('✅ Pair removed: ' + Pair.WhiteLogin + ' vs ' + Pair.BlackLogin);
+    except
+      on E: Exception do
+        Log('❌ RemovePair inner exception: ' + E.Message);
     end;
+
   finally
     ListLock.Release;
   end;
-
-  RefreshPlayerGrid;
-
 end;
-
-
-
 
 procedure TForm10.QueueLeft(AContext: TIdContext);
   var
@@ -842,67 +845,6 @@ begin
   end;
 end;
 
-procedure TForm10.BroadcastToOpponent(SenderClient: TIdContext; const Msg: string);
-var
-  Pair: TPlayerPair;
-  Forwarded: string;
-begin
-  Pair := FindPairWithPlayer(SenderClient);
-  if Pair.WhitePlayer = nil then
-    Exit;
-
-  Forwarded := 'OPPONENT_MOVE:' + Msg;
-  Log('Forwarduję ruch: ' + Forwarded);
-
-  if SenderClient = Pair.WhitePlayer then
-    Pair.BlackPlayer.Connection.IOHandler.WriteLn(Forwarded)
-  else
-    Pair.WhitePlayer.Connection.IOHandler.WriteLn(Forwarded);
-end;
-
-
-
-procedure TForm10.BroadcastPromotion(SenderClient: TIdContext; const Msg: string);
-
-var
-  Pair: TPlayerPair;
-begin
-  Pair := FindPairWithPlayer(SenderClient);
-  if Pair.WhitePlayer = nil then Exit;
-
-  if SenderClient = Pair.WhitePlayer then
-    Pair.BlackPlayer.Connection.IOHandler.WriteLn('OPPONENT_PROMO:' + Msg)
-  else
-    Pair.WhitePlayer.Connection.IOHandler.WriteLn('OPPONENT_PROMO:' + Msg);
-
-  Log('Forwarduję promocję: ' + Msg);
-
-end;
-
-
-procedure TForm10.BroadcastSan(SenderClient: TIdContext; const Msg: string);
-
-var
-  Pair: TPlayerPair;
-begin
-  Pair := FindPairWithPlayer(SenderClient);
-  if Pair.WhitePlayer = nil then Exit;
-
-
-  if SenderClient = Pair.WhitePlayer then
-    Pair.BlackPlayer.Connection.IOHandler.WriteLn('SAN:' + Msg)
-  else
-    Pair.WhitePlayer.Connection.IOHandler.WriteLn('SAN:' + Msg);
-
-  Log('Forwarduję SAN: ' + Msg);
-
-end;
-
-
-
-
-
-
 procedure TForm10.BroadcastChat(SenderClient: TIdContext; const Text: string);
 var
   Pair: TPlayerPair;
@@ -922,46 +864,24 @@ begin
   Pair.BlackPlayer.Connection.IOHandler.WriteLn(OutMsg);
 end;
 
-
-procedure TForm10.BroadcastDrawOffer(SenderClient: TIdContext);
-begin
+procedure TForm10.BroadcastCustom(SenderClient: TIdContext; const Msg: string; const Extra: string = '');
 var
   Pair: TPlayerPair;
+  FinalMsg: string;
 begin
   Pair := FindPairWithPlayer(SenderClient);
-  if (Pair.WhitePlayer = nil) or (Pair.BlackPlayer = nil) then Exit;
+  if (Pair.WhitePlayer = nil) or (Pair.BlackPlayer = nil) then
+    Exit;
+
+  if Extra <> '' then
+    FinalMsg := Msg + Extra
+  else
+    FinalMsg := Msg;
 
   if SenderClient = Pair.WhitePlayer then
-    Pair.BlackPlayer.Connection.IOHandler.WriteLn('DRAW:OFFER')
+    Pair.BlackPlayer.Connection.IOHandler.WriteLn(FinalMsg)
   else
-    Pair.WhitePlayer.Connection.IOHandler.WriteLn('DRAW:OFFER');
-
-  end;
-
-
-
-end;
-
-
-
-
-procedure TForm10.BroadcastCustom(SenderClient: TidContext; const Msg: string);
-begin
-var
-  Pair: TPlayerPair;
-begin
-  Pair := FindPairWithPlayer(SenderClient);
-  if (Pair.WhitePlayer = nil) or (Pair.BlackPlayer = nil) then Exit;
-
-  if SenderClient = Pair.WhitePlayer then
-    Pair.BlackPlayer.Connection.IOHandler.WriteLn(Msg)
-  else
-    Pair.WhitePlayer.Connection.IOHandler.WriteLn(Msg);
-
-  end;
-
-
-
+    Pair.WhitePlayer.Connection.IOHandler.WriteLn(FinalMsg);
 end;
 
 
@@ -1408,7 +1328,7 @@ end;
   Exit;
   Msg := Msg.Trim;
   if Msg.StartsWith('PROMO:') then
-    BroadcastPromotion(AContext, Msg.Substring(6))
+  BroadcastCustom(AContext,'OPPONENT_PROMO:', Msg.Substring(6))
 
   else if Msg.StartsWith('RANKING:') then
   begin
@@ -1448,13 +1368,13 @@ end;
 
   else if Msg.StartsWith('SAN:') then
   begin
-  BroadcastSAN(AContext, Msg.Substring(4).Trim);
+  BroadcastCustom(AContext,'SAN:' , Msg.Substring(4).Trim);
   Exit;
   end
 
   else if Msg.StartsWith('DRAW:OFFER') then
   begin
-  BroadcastDrawOffer(AContext);
+  BroadcastCustom(AContext,'DRAW:OFFER');
   EXIT;
   end
 
@@ -1477,11 +1397,11 @@ end;
   SendSQL(AContext,   'INSERT INTO games (result, blackplayerid, whiteplayerid, date, pgn) '+
   'VALUES (:result, :blackid, :whiteid, NOW(), :pgn)', temp);
   UpdateRanking(AContext,'');
-  RemovePair(AContext);
+ // RemovePair(AContext);
   end
 
   else
-    BroadcastToOpponent(AContext, Msg);
+  BroadcastCustom(AContext,'OPPONENT_MOVE:', Msg);
 
 end;
 

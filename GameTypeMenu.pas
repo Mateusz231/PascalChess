@@ -196,7 +196,7 @@ begin
   LeftAreaWidth := ClientWidth - PlayerList.Width;
 
   TotalH := Button1.Height + Button2.Height + Button3.Height + 2 * Spacing;
-  StartY := (ClientHeight - TotalH) div 2;
+  StartY := (ClientHeight - TotalH) div 2 - 60;
 
   BtnX := (LeftAreaWidth - Button1.Width) div 2;
   Button1.SetBounds(BtnX, StartY, Button1.Width, Button1.Height);

@@ -101,9 +101,8 @@ begin
   tsgrid.Cells[1, 0] := 'Opponent';
   tsgrid.Cells[2, 0] := 'Result';
   tsgrid.Cells[3, 0] := 'Date';
-  tsgrid.Cells[4,0] := 'Analyze';
+  tsgrid.Cells[4, 0] := 'Analyze';
 end;
-
 
 procedure TMatchHistoryForm.LoadMatchHistory;
 var
@@ -113,33 +112,22 @@ begin
 
   FDQuery1.Connection := FDConnection1;
   FDQuery1.Close;
-    FDQuery1.SQL.Text :=
-    'SELECT ' +
-    '  CASE ' +
+  FDQuery1.SQL.Text := 'SELECT ' + '  CASE ' +
     '    WHEN :userid = m.whiteplayerid THEN u_black.login ' +
-    '    ELSE u_white.login ' +
-    '  END AS opponent_login, ' +
-    '  m.result, ' +
-    '  m.date, ' +
-    '  m.gameid,'+
-    '  CASE ' +
-    '    WHEN :userid = m.whiteplayerid AND m.result = ''white'' THEN ''Win'' ' +
-    '    WHEN :userid = m.blackplayerid AND m.result = ''black'' THEN ''Win'' ' +
-    '    WHEN m.result = ''draw'' THEN ''Draw'' ' +
-    '    ELSE ''Loss'' ' +
-    '  END AS outcome ' +
-    'FROM games m ' +
+    '    ELSE u_white.login ' + '  END AS opponent_login, ' + '  m.result, ' +
+    '  m.date, ' + '  m.gameid,' + '  CASE ' +
+    '    WHEN :userid = m.whiteplayerid AND m.result = ''white'' THEN ''Win'' '
+    + '    WHEN :userid = m.blackplayerid AND m.result = ''black'' THEN ''Win'' '
+    + '    WHEN m.result = ''draw'' THEN ''Draw'' ' + '    ELSE ''Loss'' ' +
+    '  END AS outcome ' + 'FROM games m ' +
     'JOIN users u_white ON m.whiteplayerid = u_white.userid ' +
     'JOIN users u_black ON m.blackplayerid = u_black.userid ' +
     'WHERE :userid IN (m.whiteplayerid, m.blackplayerid) ' +
-    'ORDER BY m.date DESC ' +
-    'LIMIT :limit OFFSET :offset';
+    'ORDER BY m.date DESC ' + 'LIMIT :limit OFFSET :offset';
   FDQuery1.ParamByName('userid').AsInteger := UserSession.LoggedUserID;
   FDQuery1.ParamByName('limit').AsInteger := RecordsPerPage;
   FDQuery1.ParamByName('offset').AsInteger := Offset;
   FDQuery1.Open;
-
-
 
   if FDQuery1.IsEmpty then
   begin
@@ -154,14 +142,13 @@ begin
   for i := 1 to tsgrid.RowCount - 1 do
   begin
 
-  if Assigned(tsgrid.Objects[4, i]) then
-  begin
-    TGameInfo(tsgrid.Objects[4, i]).Free;
-    tsgrid.Objects[4, i] := nil;
+    if Assigned(tsgrid.Objects[4, i]) then
+    begin
+      TGameInfo(tsgrid.Objects[4, i]).Free;
+      tsgrid.Objects[4, i] := nil;
+    end;
+    tsgrid.Rows[i].Clear;
   end;
-  tsgrid.Rows[i].Clear;
-  end;
-
 
   i := 1;
   while not FDQuery1.Eof do
@@ -170,11 +157,12 @@ begin
     tsgrid.Cells[1, i] := FDQuery1.FieldByName('opponent_login').AsString;
     tsgrid.Cells[2, i] := FDQuery1.FieldByName('outcome').AsString;
     tsgrid.Cells[3, i] := FDQuery1.FieldByName('date').AsString;
-    var GameInfo:=TGameInfo.Create;
-    GameInfo.GameId:= FdQuery1.FieldByName('gameid').AsInteger;
-    GameInfo.Opponent:= FDQuery1.FieldByName('opponent_login').AsString;
-    tsgrid.Objects[4,i]:=GameInfo;
-    tsgrid.Cells[4,i]:='Analyze';
+    var
+    GameInfo := TGameInfo.Create;
+    GameInfo.GameId := FDQuery1.FieldByName('gameid').AsInteger;
+    GameInfo.Opponent := FDQuery1.FieldByName('opponent_login').AsString;
+    tsgrid.Objects[4, i] := GameInfo;
+    tsgrid.Cells[4, i] := 'Analyze';
     Inc(i);
     FDQuery1.Next;
   end;

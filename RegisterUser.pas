@@ -13,7 +13,7 @@ uses
   FireDAC.Comp.DataSet, System.Hash, UserSession;
 
 type
-  TRegisterMenu = class(TForm)
+    TRegisterMenu = class(TForm)
     RegisterButton: TButton;
     BackButton: TButton;
     Login: TEdit;

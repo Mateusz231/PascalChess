@@ -279,13 +279,6 @@ begin
   LblPageInfo.Left := ClientWidth - 120;
   LblPageInfo.Top  := 20;
 
-  ShowMessage(Format(
-  'Height=%d  ClientHeight=%d  ró¿nica=%d',
-  [GridLeaderboard.Height,
-   GridLeaderboard.ClientHeight,
-   GridLeaderboard.Height - GridLeaderboard.ClientHeight]
-));
-
   ResizeGridColumns;
 end;
 

@@ -108,6 +108,9 @@
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Locale>1033</VerInfo_Locale>
+        <Icon_MainIcon>..\..\..\..\Downloads\pngtree-black-pawn-chess-piece-clipart-isolated-png-image_15464684.ico</Icon_MainIcon>
+        <UWP_DelphiLogo150>..\..\..\..\Downloads\pngtree-black-pawn-chess-piece-clipart-isolated-png-image_15464684.png</UWP_DelphiLogo150>
+        <UWP_DelphiLogo44>..\..\..\..\Downloads\pngtree-black-pawn-chess-piece-clipart-isolated-png-image_15464684878.png</UWP_DelphiLogo44>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
@@ -185,6 +188,20 @@
                 </Excluded_Packages>
             </Delphi.Personality>
             <Deployment Version="4">
+                <DeployFile LocalName="..\..\..\..\Downloads\pngtree-black-pawn-chess-piece-clipart-isolated-png-image_15464684.png" Configuration="Debug" Class="UWP_DelphiLogo150">
+                    <Platform Name="Win64">
+                        <RemoteDir>Assets\</RemoteDir>
+                        <RemoteName>Logo150x150.png</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="..\..\..\..\Downloads\pngtree-black-pawn-chess-piece-clipart-isolated-png-image_15464684878.png" Configuration="Debug" Class="UWP_DelphiLogo44">
+                    <Platform Name="Win64">
+                        <RemoteDir>Assets\</RemoteDir>
+                        <RemoteName>Logo44x44.png</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
                 <DeployFile LocalName="Win32\Debug\ChessArena.exe" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>ChessArena.exe</RemoteName>

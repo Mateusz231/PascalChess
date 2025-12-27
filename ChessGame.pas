@@ -819,87 +819,91 @@ end;
 
 procedure TChess.InitializeState;
 var i, j: Integer;
-  output: string;
+  Output: string;
   sr, sc, tr, tc: Integer;
   San: String;
-  promo: Tpiece;
+  promo: TPiece;
 begin
 
- HasWhiteKingMoved:= false;
- HasWhiteRookA1Moved:= false;
- HasWhiteRookH1Moved:= false;
- HasBlackKingMoved:= false;
- HasBlackRookA8Moved:= false;
- HasBlackRookH8Moved:= false;
+  HasWhiteKingMoved := False;
+  HasWhiteRookA1Moved := False;
+  HasWhiteRookH1Moved := False;
+  HasBlackKingMoved := False;
+  HasBlackRookA8Moved := False;
+  HasBlackRookH8Moved := False;
 
   for i := 0 to 7 do
     for j := 0 to 7 do
-      BoardState[i,j] := ptNone;
+      BoardState[i, j] := ptNone;
 
-  BoardState[7,0] := ptWRook; BoardState[7,1] := ptWKnight;
-  BoardState[7,2] := ptWBishop; BoardState[7,3] := ptWQueen;
-  BoardState[7,4] := ptWKing; BoardState[7,5] := ptWBishop;
-  BoardState[7,6] := ptWKnight;BoardState[7,7] := ptWRook;
-  for j := 0 to 7 do BoardState[6,j] := ptWPawn;
+  BoardState[7, 0] := ptWRook;
+  BoardState[7, 1] := ptWKnight;
+  BoardState[7, 2] := ptWBishop;
+  BoardState[7, 3] := ptWQueen;
+  BoardState[7, 4] := ptWKing;
+  BoardState[7, 5] := ptWBishop;
+  BoardState[7, 6] := ptWKnight;
+  BoardState[7, 7] := ptWRook;
+  for j := 0 to 7 do
+    BoardState[6, j] := ptWPawn;
 
-  BoardState[0,0] := ptBRook; BoardState[0,1] := ptBKnight;
-  BoardState[0,2] := ptBBishop;BoardState[0,3] := ptBQueen;
-  BoardState[0,4] := ptBKing;  BoardState[0,5] := ptBBishop;
-  BoardState[0,6] := ptBKnight;BoardState[0,7] := ptBRook;
-  for j := 0 to 7 do BoardState[1,j] := ptBPawn;
+  BoardState[0, 0] := ptBRook;
+  BoardState[0, 1] := ptBKnight;
+  BoardState[0, 2] := ptBBishop;
+  BoardState[0, 3] := ptBQueen;
+  BoardState[0, 4] := ptBKing;
+  BoardState[0, 5] := ptBBishop;
+  BoardState[0, 6] := ptBKnight;
+  BoardState[0, 7] := ptBRook;
+  for j := 0 to 7 do
+    BoardState[1, j] := ptBPawn;
 
   for i := 0 to 7 do
     for j := 0 to 7 do
-      BoardPanels[i,j].Caption := PieceToChar(BoardState[i,j]);
+      BoardPanels[i, j].Caption := PieceToChar(BoardState[i, j]);
 
-  SelectedSrc := Point(-1,-1);
-  LastSrc := Point(-1,-1);
-  LastDst := Point(-1,-1);
+  SelectedSrc := Point(-1, -1);
+  LastSrc := Point(-1, -1);
+  LastDst := Point(-1, -1);
   IsMyTurn := False;
 
   if GameType = 4 then
   begin
 
-  If MyColor='BLACK' then
-   begin
-
-    Uci.SendCommand('position startpos moves ' + FMoveHistory);
-    Uci.SendCommand('go depth 12');
-
-    repeat
-    output := Uci.ReadOutput;
-    until output.Contains('bestmove');
-    var move2 := ExtractBestMove(output);
-    if (move2 <> '') and UciToCoords(move2, sr, sc, tr, tc) then
+    If MyColor = 'BLACK' then
     begin
-      var wasCapture := BoardState[tr, tc] <> ptNone;
-      var   p := BoardState[sr, sc];
-      san:=MoveToSAN(p,Point(sc,sr),Point(tc,tr),wasCapture,promo);
-      ApplyMove(sr, sc, tr, tc, ptNone);
-          if PromotionFlag then
+
+      Uci.SendCommand('position startpos moves ' + FMoveHistory);
+      Uci.SendCommand('go depth 12');
+
+      repeat
+        Output := Uci.ReadOutput;
+      until Output.Contains('bestmove');
+      var
+      move2 := ExtractBestMove(Output);
+      if (move2 <> '') and UciToCoords(move2, sr, sc, tr, tc) then
+      begin
+        var wasCapture := BoardState[tr, tc] <> ptNone;
+        var  P := BoardState[sr, sc];
+        San := MoveToSAN(P, Point(sc, sr), Point(tc, tr), wasCapture, promo);
+        ApplyMove(sr, sc, tr, tc, ptNone);
+        if PromotionFlag then
         begin
-        promo := CodeToPiece(PromotionChar);
+          promo := CodeToPiece(promotionChar);
         end
         else
-        promo := ptNone;
+          promo := ptNone;
 
-      san:= san+SanHelper(promo);
-      AddMoveToList(san);
-      FMoveHistory := FMoveHistory + ' ' + move2;
-      IsMyTurn:=True;
+        San := San + SanHelper(promo);
+        AddMoveToList(San);
+        FMoveHistory := FMoveHistory + ' ' + move2;
+        IsMyTurn := True;
 
-       end
+      end
 
-
-
-
-     end;
-
-
-
+    end;
 
   end;
-
 
 end;
 
@@ -1826,8 +1830,8 @@ begin
   P := BoardState[srcRow, srcCol];
 
   // en passant: bijemy pionek 'po skosie' na pustym polu
-  if ((P = ptWPawn) or (P = ptBPawn)) and (srcCol <> dstCol)
-     and (BoardState[dstRow, dstCol] = ptNone) then
+  if ((P = ptWPawn) or (P = ptBPawn)) and (srcCol <> dstCol) and
+    (BoardState[dstRow, dstCol] = ptNone) then
   begin
     // wylicz pole, skąd bijemy:
     if P = ptWPawn then
@@ -1840,119 +1844,115 @@ begin
     BoardPanels[capRow, capCol].Caption := '';
   end;
 
-
-
-    if BoardState[srcRow,srcCol] in [ptWKing, ptBKing] then
+  if BoardState[srcRow, srcCol] in [ptWKing, ptBKing] then
   begin
-    if BoardState[srcRow,srcCol] = ptWKing then
+    if BoardState[srcRow, srcCol] = ptWKing then
       HasWhiteKingMoved := True
     else
       HasBlackKingMoved := True;
   end;
 
-
-   if BoardState[srcRow,srcCol] = ptWRook then
+  if BoardState[srcRow, srcCol] = ptWRook then
   begin
-    if (srcRow=7) and (srcCol=0) then HasWhiteRookA1Moved := True;
-    if (srcRow=7) and (srcCol=7) then HasWhiteRookH1Moved := True;
+    if (srcRow = 7) and (srcCol = 0) then
+      HasWhiteRookA1Moved := True;
+    if (srcRow = 7) and (srcCol = 7) then
+      HasWhiteRookH1Moved := True;
   end
-  else if BoardState[srcRow,srcCol] = ptBRook then
+  else if BoardState[srcRow, srcCol] = ptBRook then
   begin
-    if (srcRow=0) and (srcCol=0) then HasBlackRookA8Moved := True;
-    if (srcRow=0) and (srcCol=7) then HasBlackRookH8Moved := True;
+    if (srcRow = 0) and (srcCol = 0) then
+      HasBlackRookA8Moved := True;
+    if (srcRow = 0) and (srcCol = 7) then
+      HasBlackRookH8Moved := True;
   end;
 
-
-
-
-   if (P in [ptWKing, ptBKing]) and (Abs(dstCol - srcCol) = 2) then
-begin
-  if dstCol = srcCol + 2 then
+  if (P in [ptWKing, ptBKing]) and (Abs(dstCol - srcCol) = 2) then
   begin
-    // przesuń wieżę z h-file na f-file
-    BoardState[srcRow,7] := ptNone;
-    BoardPanels[srcRow,7].Caption := '';
-    if P = ptWKing then
-  BoardState[srcRow,5] := ptWRook
-   else
-  BoardState[srcRow,5] := ptBRook;
-    BoardPanels[srcRow,5].Caption := PieceToChar(BoardState[srcRow,5]);
-  end
-  // długie O-O-O
-  else if dstCol = srcCol - 2 then
-  begin
-    // przesuń wieżę z a-file na d-file
-    BoardState[srcRow,0] := ptNone;
-    BoardPanels[srcRow,0].Caption := '';
-    if P = ptWKing then
-  BoardState[srcRow,3] := ptWRook
-  else
-  BoardState[srcRow,3] := ptBRook;
-    BoardPanels[srcRow,3].Caption := PieceToChar(BoardState[srcRow,3]);
-  end;
-end;
-
-
-    if ((P = ptWPawn) and (dstRow = 0)) or ((P = ptBPawn) and (dstRow = 7)) then
-  begin
-
-      if promotionPiece <> ptNone then
-    P := promotionPiece
-      else if IsMyTurn then
-  begin
-    promotedChar := PromotePawnDialog;
-    PromotionFlag:= true;
-    if promotedChar = '♕' then
+    if dstCol = srcCol + 2 then
     begin
-    P := ptWQueen;
-    promotionChar:='QW'
+      // przesuń wieżę z h-file na f-file
+      BoardState[srcRow, 7] := ptNone;
+      BoardPanels[srcRow, 7].Caption := '';
+      if P = ptWKing then
+        BoardState[srcRow, 5] := ptWRook
+      else
+        BoardState[srcRow, 5] := ptBRook;
+      BoardPanels[srcRow, 5].Caption := PieceToChar(BoardState[srcRow, 5]);
     end
-
-    else if promotedChar = '♖' then
+    // długie O-O-O
+    else if dstCol = srcCol - 2 then
     begin
-    P := ptWRook;
-    promotionChar:='RW'
-    end
-
-    else if promotedChar = '♗' then
-    begin
-    P := ptWBishop;
-    promotionChar:='BW'
-    end
-
-    else if promotedChar = '♘' then
-    begin
-    P := ptWKnight;
-    promotionChar:='KW'
-
-    end
-
-    else if promotedChar = '♛' then
-    begin
-     P := ptBQueen;
-     promotionChar:='QB'
-    end
-
-    else if promotedChar = '♜' then
-    begin
-    P := ptBRook;
-    promotionChar:='RB'
-    end
-
-    else if promotedChar = '♝' then
-    begin
-    P := ptBBishop;
-    promotionChar:='BB'
-    end
-
-    else if promotedChar = '♞' then
-    begin
-    P := ptBKnight;
-    promotionChar:='KB'
+      // przesuń wieżę z a-file na d-file
+      BoardState[srcRow, 0] := ptNone;
+      BoardPanels[srcRow, 0].Caption := '';
+      if P = ptWKing then
+        BoardState[srcRow, 3] := ptWRook
+      else
+        BoardState[srcRow, 3] := ptBRook;
+      BoardPanels[srcRow, 3].Caption := PieceToChar(BoardState[srcRow, 3]);
     end;
-
   end;
 
+  if ((P = ptWPawn) and (dstRow = 0)) or ((P = ptBPawn) and (dstRow = 7)) then
+  begin
+
+    if promotionPiece <> ptNone then
+      P := promotionPiece
+    else if IsMyTurn then
+    begin
+      promotedChar := PromotePawnDialog;
+      PromotionFlag := True;
+      if promotedChar = '♕' then
+      begin
+        P := ptWQueen;
+        promotionChar := 'QW'
+      end
+
+      else if promotedChar = '♖' then
+      begin
+        P := ptWRook;
+        promotionChar := 'RW'
+      end
+
+      else if promotedChar = '♗' then
+      begin
+        P := ptWBishop;
+        promotionChar := 'BW'
+      end
+
+      else if promotedChar = '♘' then
+      begin
+        P := ptWKnight;
+        promotionChar := 'KW'
+
+      end
+
+      else if promotedChar = '♛' then
+      begin
+        P := ptBQueen;
+        promotionChar := 'QB'
+      end
+
+      else if promotedChar = '♜' then
+      begin
+        P := ptBRook;
+        promotionChar := 'RB'
+      end
+
+      else if promotedChar = '♝' then
+      begin
+        P := ptBBishop;
+        promotionChar := 'BB'
+      end
+
+      else if promotedChar = '♞' then
+      begin
+        P := ptBKnight;
+        promotionChar := 'KB'
+      end;
+
+    end;
 
   end;
   // normalny ruch i bicie
@@ -1965,8 +1965,6 @@ end;
   UpdateBoardColors;
 
 end;
-
-
 
 procedure TChess.UpdateBoardColors;
 var
@@ -2072,7 +2070,10 @@ begin
       nr := r + dr;  nc := c + dc;
       if InRange(nr, 0, 7) and InRange(nc, 0, 7) and
          (BoardState[nr, nc] = ptWPawn) then
+        begin
         Exit(True);
+        end;
+
     end;
   end
   else
@@ -2084,7 +2085,10 @@ begin
       nr := r + dr;  nc := c + dc;
       if InRange(nr, 0, 7) and InRange(nc, 0, 7) and
          (BoardState[nr, nc] = ptBPawn) then
+         begin
         Exit(True);
+         end;
+
     end;
   end;
 
@@ -2098,7 +2102,10 @@ begin
       attacker := BoardState[nr, nc];
       if ((byColor = 'WHITE') and (attacker = ptWKnight)) or
          ((byColor = 'BLACK') and (attacker = ptBKnight)) then
+         begin
         Exit(True);
+         end;
+
     end;
   end;
 
@@ -2116,7 +2123,10 @@ begin
       begin
         if ((byColor = 'WHITE') and ((attacker = ptWRook) or (attacker = ptWQueen))) or
            ((byColor = 'BLACK') and ((attacker = ptBRook) or (attacker = ptBQueen))) then
-          Exit(True)
+           begin
+           Exit(True)
+           end
+
         else
           Break;
       end;
@@ -2139,7 +2149,10 @@ begin
       begin
         if ((byColor = 'WHITE') and ((attacker = ptWBishop) or (attacker = ptWQueen))) or
            ((byColor = 'BLACK') and ((attacker = ptBBishop) or (attacker = ptBQueen))) then
-          Exit(True)
+           begin
+           Exit(True)
+           end
+
         else
           Break;
       end;
@@ -2160,7 +2173,10 @@ begin
           attacker := BoardState[nr, nc];
           if ((byColor = 'WHITE') and (attacker = ptWKing)) or
              ((byColor = 'BLACK') and (attacker = ptBKing)) then
-            Exit(True);
+            begin
+             Exit(True)
+            end;
+
         end;
       end;
 end;
