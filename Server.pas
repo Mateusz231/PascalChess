@@ -136,14 +136,12 @@ begin
   ContextToLogin:= TDictionary<TidContext, string>.Create();
 
   MemoLog.Clear;
-  Log('Server startuje...');
+  Log('Server starting..');
 
   IdTCPServer1.DefaultPort := 5000;
   IdTCPServer1.OnConnect    := IdTCPServer1Connect;
   IdTCPServer1.OnDisconnect := IdTCPServer1Disconnect;
   IdTCPServer1.Active      := True;
-
-  Log('Serwer nasłuchuje na porcie 5000');
 end;
 
 procedure TForm10.FormDestroy(Sender: TObject);
@@ -156,12 +154,12 @@ begin
   ActivePairs.Free;
   ActivePlayers.Free;
   ContextToLogin.Free;
-  Log('Serwer zatrzymany');
+  Log('Server stopped');
 end;
 
 procedure TForm10.IdTCPServer1Connect(AContext: TIdContext);
 begin
-  Log('Nowe połączenie z ' + AContext.Binding.PeerIP + ':' + AContext.Binding.PeerPort.ToString);
+  Log('New connection from:' + AContext.Binding.PeerIP + ':' + AContext.Binding.PeerPort.ToString);
 end;
 
 
@@ -171,11 +169,11 @@ var
 Login: string;
 
 begin
-  Log('Rozłączono ' + AContext.Binding.PeerIP + ':' + AContext.Binding.PeerPort.ToString);
+  Log('Disconnected ' + AContext.Binding.PeerIP + ':' + AContext.Binding.PeerPort.ToString);
 
   if ContextToLogin.TryGetValue(AContext, Login) then
   begin
-    Log('Gracz rozłączony: ' + Login);
+    Log('Player disconnected: ' + Login);
 
     ContextToLogin.Remove(AContext);
     ActivePlayers.Remove(Login);
@@ -183,7 +181,7 @@ begin
 
   else
   begin
-    Log('Nieznany kontekst rozłączony (brak loginu)');
+    Log('Missing login!');
   end;
 
 
@@ -239,7 +237,7 @@ begin
         begin
           Opponent.Connection.IOHandler.WriteLn('OPPONENT_LEFT');
          // Opponent.Connection.IOHandler.WriteLn('PGN:');
-          Log('Wysłano do przeciwnika: OPPONENT_LEFT');
+          Log('Sent to opponent: OPPONENT_LEFT');
         end;
 
         Break;
@@ -985,7 +983,7 @@ var
 begin
 
   Msg := AContext.Connection.IOHandler.ReadLn;
-  Log('Odebrano od ' + AContext.Binding.PeerIP + ': ' + Msg);
+  Log('Got from: ' + AContext.Binding.PeerIP + ': ' + Msg);
 
 
 
@@ -1239,10 +1237,10 @@ end;
     Info.Login   := Msg.Substring(6);
 
     Msg := AContext.Connection.IOHandler.ReadLn;
-    Log('Odebrano: ' + Msg);
+    Log('Got: ' + Msg);
     if not Msg.StartsWith('ID:') then
     begin
-      Log('Błędny protokół – oczekiwano ID:, dostałem: ' + Msg);
+      Log('Expected login, got: ' + Msg);
       Exit;
     end;
     Info.ID := StrToIntDef(Msg.Substring(3), 0);
@@ -1251,7 +1249,7 @@ end;
     Log('Odebrano: ' + Msg);
     if not Msg.StartsWith('MODE:') then
     begin
-      Log('Błędny protokół – oczekiwano MODE:, dostałem: ' + Msg);
+      Log('Expected mode, got: ' + Msg);
       Exit;
     end;
     mode := UpperCase(Msg.Substring(5));
@@ -1309,7 +1307,7 @@ end;
 
     else
 
-        Log('Nieznany tryb gry: ' + mode);
+        Log('Unknown gamemode: ' + mode);
     finally
       ListLock.Release;
     end;
